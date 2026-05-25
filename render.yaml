@@ -1,0 +1,33 @@
+databases:
+  - name: thesisreview-db
+    databaseName: thesisreview
+    user: thesisreview
+    plan: free
+
+services:
+  - type: web
+    name: thesisreview-api
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn api_server:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: thesisreview-db
+          property: connectionString
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: CROSSREF_ENABLED
+        value: "true"
+      - key: ORCID_ENABLED
+        value: "true"
+      - key: COPYLEAKS_API_KEY
+        sync: false
+      - key: COPYLEAKS_EMAIL
+        sync: false
+      - key: APP_SECRET
+        generateValue: true
+      - key: MAX_FILE_MB
+        value: "20"

@@ -1,0 +1,18 @@
+{
+  "expo": {
+    "name": "ThesisReview Student",
+    "slug": "thesis-review-student",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.demo.thesisreviewstudent"
+    }
+  }
+}

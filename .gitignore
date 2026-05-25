@@ -1,0 +1,49 @@
+# Variables de entorno — NUNCA subir al repositorio
+.env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+venv/
+.venv/
+env/
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+
+# Base de datos y uploads locales
+data/thesis_review.db
+data/uploads/
+data/reports/
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+streamlit_*.txt
+
+# Node / Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.vite/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Mobile
+mobile/node_modules/
+mobile/.expo/
+
+# Archivos de muestra grandes
+sample_documents/

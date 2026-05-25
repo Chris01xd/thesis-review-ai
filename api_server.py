@@ -1,0 +1,788 @@
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+from typing import Optional
+import os, json, time
+import httpx
+
+from modules.database import init_db, query, execute, log, hash_password, check_password, now
+from modules.document_processing import extract_text_from_upload
+from modules.ai_engine import local_agentic_analysis, agent_plan_for_document
+from modules.plagiarism import run_similarity_check
+from modules.citations import validate_citations
+from modules.reports import generate_review_pdf
+
+init_db()
+os.makedirs("data/uploads", exist_ok=True)
+
+app = FastAPI(
+    title="ThesisReview API",
+    description="API REST para ThesisReview AI — frontend React y app móvil.",
+    version="3.0.0",
+    contact={"name": "ThesisReview AI", "email": "admin@tesis.edu"},
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+
+def row_to_dict(row):
+    return dict(row) if row else None
+
+
+def get_user_from_token(token: str) -> Optional[dict]:
+    """Extract user from demo token demo-token-{id}."""
+    if not token or not token.startswith("demo-token-"):
+        return None
+    try:
+        uid = int(token.replace("demo-token-", ""))
+        rows = query("SELECT * FROM users WHERE id=?", (uid,))
+        return dict(rows[0]) if rows else None
+    except Exception:
+        return None
+
+
+# ── Auth ─────────────────────────────────────────────────────────────────────
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+@app.post("/api/auth/login", summary="Autenticación de usuario", tags=["Auth"])
+def login(req: LoginRequest):
+    rows = query("SELECT * FROM users WHERE email=?", (req.email,))
+    if not rows:
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+    if not check_password(req.password, rows[0]["password_hash"]):
+        raise HTTPException(status_code=401, detail="Credenciales incorrectas")
+    u = dict(rows[0])
+    u.pop("password_hash", None)
+    log(u["id"], "LOGIN", "users", u["id"])
+    return {
+        "user": u,
+        "token": f"demo-token-{u['id']}",
+        "note": "Token demo. En producción usar JWT con expiración."
+    }
+
+
+# ── Health ────────────────────────────────────────────────────────────────────
+
+@app.get("/", summary="Health check", tags=["Sistema"])
+def root():
+    return {"status": "ok", "name": "ThesisReview API", "version": "3.0.0", "docs": "/docs"}
+
+
+# ── Programas ─────────────────────────────────────────────────────────────────
+
+@app.get("/api/programs", summary="Listar programas", tags=["Programas"])
+def get_programs():
+    return [dict(r) for r in query("SELECT id, name FROM programs ORDER BY id")]
+
+
+# ── Estudiantes ───────────────────────────────────────────────────────────────
+
+@app.get("/api/students", summary="Listar estudiantes", tags=["Estudiantes"])
+def students():
+    rows = query(
+        """SELECT u.id, u.name, u.email, u.role, p.name AS program, adv.name AS advisor
+           FROM users u
+           LEFT JOIN programs p ON p.id = u.program_id
+           LEFT JOIN users adv ON adv.id = u.advisor_id
+           WHERE u.role='STUDENT' ORDER BY u.id"""
+    )
+    return [dict(r) for r in rows]
+
+
+@app.get("/api/student/{student_id}/dashboard", summary="Dashboard del estudiante", tags=["Estudiantes"])
+def student_dashboard(student_id: int):
+    student_rows = query(
+        """SELECT u.id, u.name, u.email, p.name AS program, adv.name AS advisor
+           FROM users u
+           LEFT JOIN programs p ON p.id = u.program_id
+           LEFT JOIN users adv ON adv.id = u.advisor_id
+           WHERE u.id=? AND u.role='STUDENT'""", (student_id,)
+    )
+    if not student_rows:
+        raise HTTPException(status_code=404, detail="Estudiante no encontrado")
+    advances = query(
+        """SELECT a.id, a.title, a.status, a.advance_type, a.version, a.created_at,
+                  ai.overall_score, ai.grade,
+                  (SELECT COUNT(*) FROM findings f JOIN ai_analyses ai2 ON ai2.id=f.analysis_id
+                   WHERE ai2.advance_id=a.id AND COALESCE(f.human_action,'Pendiente') != 'Aceptado') AS findings_pending
+           FROM advances a LEFT JOIN ai_analyses ai ON ai.advance_id = a.id
+           WHERE a.student_id=? ORDER BY a.id DESC""", (student_id,)
+    )
+    latest = dict(advances[0]) if advances else None
+    return {
+        "student": dict(student_rows[0]),
+        "latest": latest,
+        "summary": {
+            "total_advances": len(advances),
+            "pending_findings": sum([(r["findings_pending"] or 0) for r in advances]),
+            "last_grade": latest["grade"] if latest else None,
+            "last_score": latest["overall_score"] if latest else None,
+        }
+    }
+
+
+@app.get("/api/student/{student_id}/advances", summary="Avances del estudiante", tags=["Estudiantes"])
+def student_advances(student_id: int):
+    rows = query(
+        """SELECT a.id, a.title, a.status, a.advance_type, a.version, a.created_at,
+                  ai.overall_score, ai.grade,
+                  (SELECT COUNT(*) FROM findings f JOIN ai_analyses ai2 ON ai2.id=f.analysis_id
+                   WHERE ai2.advance_id=a.id) AS total_findings
+           FROM advances a LEFT JOIN ai_analyses ai ON ai.advance_id = a.id
+           WHERE a.student_id=? ORDER BY a.id DESC""", (student_id,)
+    )
+    return [dict(r) for r in rows]
+
+
+@app.get("/api/student/{student_id}/grade-history", summary="Historial de notas", tags=["Avances"])
+def grade_history(student_id: int):
+    rows = query(
+        """SELECT a.id, a.title, a.version, a.created_at, ai.grade, ai.overall_score
+           FROM advances a JOIN ai_analyses ai ON ai.advance_id = a.id
+           WHERE a.student_id=? ORDER BY a.id ASC""", (student_id,)
+    )
+    return [dict(r) for r in rows]
+
+
+# ── Avances ───────────────────────────────────────────────────────────────────
+
+@app.get("/api/advances", summary="Listar avances", tags=["Avances"])
+def list_advances(
+    student_id: Optional[int] = None,
+    advisor_id: Optional[int] = None,
+    program_id: Optional[int] = None,
+    status: Optional[str] = None,
+    limit: Optional[int] = 200,
+):
+    conditions = []
+    params: list = []
+    if student_id:
+        conditions.append("a.student_id=?"); params.append(student_id)
+    if advisor_id:
+        conditions.append("a.advisor_id=?"); params.append(advisor_id)
+    if program_id:
+        conditions.append("a.program_id=?"); params.append(program_id)
+    if status:
+        conditions.append("a.status=?"); params.append(status)
+    where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+    rows = query(
+        f"""SELECT a.id, a.title, a.status, a.advance_type, a.version, a.created_at,
+                   a.page_count, a.student_id, a.advisor_id,
+                   ai.overall_score, ai.grade,
+                   s.name AS student_name, adv.name AS advisor_name, p.name AS program_name,
+                   (SELECT COUNT(*) FROM findings f JOIN ai_analyses ai2 ON ai2.id=f.analysis_id
+                    WHERE ai2.advance_id=a.id) AS total_findings
+            FROM advances a
+            LEFT JOIN ai_analyses ai ON ai.advance_id = a.id
+            LEFT JOIN users s ON s.id = a.student_id
+            LEFT JOIN users adv ON adv.id = a.advisor_id
+            LEFT JOIN programs p ON p.id = a.program_id
+            {where} ORDER BY a.id DESC LIMIT ?""",
+        params + [limit],
+    )
+    return [dict(r) for r in rows]
+
+
+@app.get("/api/advance/{advance_id}", summary="Detalle de avance", tags=["Avances"])
+def get_advance(advance_id: int):
+    rows = query(
+        """SELECT a.*, s.name AS student_name, adv.name AS advisor_name, p.name AS program_name
+           FROM advances a
+           LEFT JOIN users s ON s.id = a.student_id
+           LEFT JOIN users adv ON adv.id = a.advisor_id
+           LEFT JOIN programs p ON p.id = a.program_id
+           WHERE a.id=?""", (advance_id,)
+    )
+    if not rows:
+        raise HTTPException(status_code=404, detail="Avance no encontrado")
+    analysis_rows = query("SELECT * FROM ai_analyses WHERE advance_id=?", (advance_id,))
+    return {
+        "advance": dict(rows[0]),
+        "analysis": dict(analysis_rows[0]) if analysis_rows else None,
+    }
+
+
+@app.post("/api/advance/upload", summary="Subir avance + análisis IA", tags=["Avances"])
+async def upload_advance(
+    file: UploadFile = File(...),
+    title: str = Form(...),
+    student_id: int = Form(...),
+    advance_type: str = Form("Capítulo I"),
+    version: int = Form(1),
+    auto_analyze: str = Form("1"),
+):
+    student_rows = query(
+        "SELECT id, program_id, advisor_id FROM users WHERE id=? AND role='STUDENT'",
+        (student_id,),
+    )
+    if not student_rows:
+        raise HTTPException(status_code=404, detail="Estudiante no encontrado")
+    student = dict(student_rows[0])
+
+    program_id = student["program_id"] or 1
+    advisor_id = student["advisor_id"]
+
+    # Pick active template for this program (fallback to first available)
+    tpl_rows = query(
+        "SELECT * FROM templates WHERE program_id=? AND active=1 LIMIT 1", (program_id,)
+    )
+    if not tpl_rows:
+        tpl_rows = query("SELECT * FROM templates WHERE active=1 LIMIT 1")
+    if not tpl_rows:
+        raise HTTPException(status_code=400, detail="No hay plantillas activas configuradas")
+    tpl = dict(tpl_rows[0])
+
+    # Save file
+    ext = os.path.splitext(file.filename or "")[1].lower()
+    fname = f"{int(time.time())}_{file.filename or 'upload' + ext}"
+    fpath = os.path.join("data", "uploads", fname)
+    content = await file.read()
+    with open(fpath, "wb") as f:
+        f.write(content)
+
+    # Extract text
+    text, pages = extract_text_from_upload(fpath, ext)
+
+    # Create advance record
+    advance_id = execute(
+        """INSERT INTO advances(student_id,advisor_id,program_id,template_id,title,advance_type,
+                                version,filename,file_path,file_type,text_content,page_count,status,created_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (student_id, advisor_id, program_id, tpl["id"], title, advance_type,
+         version, file.filename, fpath, ext, text, pages,
+         "Análisis IA en proceso" if auto_analyze == "1" else "Pendiente", now()),
+    )
+    log(student_id, "UPLOAD", "advances", advance_id, {"title": title})
+
+    if auto_analyze == "1":
+        _run_analysis(advance_id, tpl, student_id)
+
+    return {"advance_id": advance_id, "message": "Avance cargado exitosamente."}
+
+
+def _run_analysis(advance_id: int, tpl: dict, actor_id: int):
+    adv_rows = query("SELECT * FROM advances WHERE id=?", (advance_id,))
+    if not adv_rows:
+        return
+    adv = dict(adv_rows[0])
+    expected = (tpl.get("expected_sections") or "").split("|")
+    rubric = {}
+    try:
+        rubric = json.loads(tpl.get("rubric_json") or "{}")
+    except Exception:
+        pass
+
+    t0 = time.time()
+    result = local_agentic_analysis(adv["text_content"] or "", expected, rubric, adv["advance_type"])
+    ms = int((time.time() - t0) * 1000)
+
+    execute("DELETE FROM ai_analyses WHERE advance_id=?", (advance_id,))
+    aid = execute(
+        """INSERT INTO ai_analyses(advance_id,structure_score,content_score,form_score,
+                                   originality_score,overall_score,grade,executive_summary,
+                                   model_used,processing_ms,created_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+        (advance_id, result["scores"]["structure"], result["scores"]["content"],
+         result["scores"]["form"], result["scores"]["originality"], result["scores"]["overall"],
+         result["grade"], result["executiveSummary"], result.get("model", "local"), ms, now()),
+    )
+
+    for f in result.get("findings", []):
+        execute(
+            """INSERT INTO findings(analysis_id,type,section_ref,page_ref,severity,description,
+                                    correction_steps,example_improvement,recommendation,created_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (aid, f.get("type"), f.get("section_ref"), f.get("page_ref"), f.get("severity"),
+             f.get("description"), f.get("correction_steps"), f.get("example_improvement"),
+             f.get("recommendation"), now()),
+        )
+
+    run_similarity_check(advance_id, adv["text_content"] or "", adv["program_id"])
+    validate_citations(advance_id, adv["text_content"] or "", online=False)
+    execute("UPDATE advances SET status=? WHERE id=?", ("En revisión humana", advance_id))
+    log(actor_id, "AI_ANALYSIS", "advances", advance_id, {"grade": result["grade"]})
+
+
+@app.post("/api/advance/{advance_id}/analyze", summary="Ejecutar análisis IA", tags=["Avances"])
+def analyze_advance(advance_id: int):
+    adv_rows = query("SELECT * FROM advances WHERE id=?", (advance_id,))
+    if not adv_rows:
+        raise HTTPException(status_code=404, detail="Avance no encontrado")
+    adv = dict(adv_rows[0])
+    tpl_rows = query("SELECT * FROM templates WHERE id=?", (adv.get("template_id"),))
+    if not tpl_rows:
+        raise HTTPException(status_code=400, detail="Sin plantilla asignada")
+    execute("UPDATE advances SET status=? WHERE id=?", ("Análisis IA en proceso", advance_id))
+    _run_analysis(advance_id, dict(tpl_rows[0]), adv["student_id"])
+    return {"message": "Análisis IA completado"}
+
+
+# ── Hallazgos ─────────────────────────────────────────────────────────────────
+
+@app.get("/api/advance/{advance_id}/findings", summary="Hallazgos de un avance", tags=["Hallazgos"])
+def advance_findings(advance_id: int):
+    rows = query(
+        """SELECT f.id, f.type, f.section_ref, f.severity, f.description,
+                  f.correction_steps, f.example_improvement, f.recommendation,
+                  f.human_action, f.human_comment
+           FROM findings f JOIN ai_analyses ai ON ai.id = f.analysis_id
+           WHERE ai.advance_id=?
+           ORDER BY CASE f.severity WHEN 'Crítico' THEN 1 WHEN 'Mayor' THEN 2
+                    WHEN 'Menor' THEN 3 ELSE 4 END, f.id""",
+        (advance_id,),
+    )
+    return [dict(r) for r in rows]
+
+
+class FindingUpdate(BaseModel):
+    human_action: str
+    human_comment: str = ""
+
+
+@app.patch("/api/finding/{finding_id}", summary="Revisar hallazgo", tags=["Hallazgos"])
+def update_finding(finding_id: int, data: FindingUpdate):
+    rows = query("SELECT id FROM findings WHERE id=?", (finding_id,))
+    if not rows:
+        raise HTTPException(status_code=404, detail="Hallazgo no encontrado")
+    execute(
+        "UPDATE findings SET human_action=?, human_comment=? WHERE id=?",
+        (data.human_action, data.human_comment, finding_id),
+    )
+    return dict(query("SELECT * FROM findings WHERE id=?", (finding_id,))[0])
+
+
+# ── Citas y similitud ─────────────────────────────────────────────────────────
+
+@app.get("/api/advance/{advance_id}/citations", summary="Citas bibliográficas", tags=["Avances"])
+def citations(advance_id: int):
+    rows = query(
+        "SELECT id, raw_reference, title, year, doi, status, source, suggestion FROM citations WHERE advance_id=? ORDER BY id",
+        (advance_id,),
+    )
+    return [dict(r) for r in rows]
+
+
+@app.get("/api/advance/{advance_id}/similarity", summary="Resultados de similitud", tags=["Avances"])
+def similarity(advance_id: int):
+    rows = query(
+        """SELECT pr.id, pr.similarity, pr.section_ref, pr.status, a.title AS compared_title
+           FROM plagiarism_results pr LEFT JOIN advances a ON a.id = pr.compared_advance_id
+           WHERE pr.advance_id=? ORDER BY pr.similarity DESC""",
+        (advance_id,),
+    )
+    return [dict(r) for r in rows]
+
+
+# ── Reportes ──────────────────────────────────────────────────────────────────
+
+@app.get("/api/advance/{advance_id}/report", summary="Descargar reporte PDF", tags=["Reportes"])
+def download_report(advance_id: int):
+    rows = query("SELECT id, status FROM advances WHERE id=?", (advance_id,))
+    if not rows:
+        raise HTTPException(status_code=404, detail="Avance no encontrado")
+    path = generate_review_pdf(advance_id)
+    if not path or not os.path.exists(path):
+        raise HTTPException(status_code=500, detail="No se pudo generar el reporte")
+    return FileResponse(path, media_type="application/pdf", filename=os.path.basename(path))
+
+
+# ── Estadísticas ──────────────────────────────────────────────────────────────
+
+@app.get("/api/stats", summary="Estadísticas del programa", tags=["Stats"])
+def get_stats(program_id: Optional[int] = None):
+    cond = "WHERE a.program_id=?" if program_id else ""
+    params_prog = (program_id,) if program_id else ()
+
+    total_students = query(
+        "SELECT COUNT(*) AS c FROM users WHERE role='STUDENT'" +
+        (" AND program_id=?" if program_id else ""), params_prog
+    )[0]["c"]
+
+    total_advances = query(
+        f"SELECT COUNT(*) AS c FROM advances a {cond}", params_prog
+    )[0]["c"]
+
+    pending = query(
+        f"SELECT COUNT(*) AS c FROM advances a {cond} {'AND' if cond else 'WHERE'} a.status='En revisión humana'",
+        params_prog,
+    )[0]["c"]
+
+    approved = query(
+        f"SELECT COUNT(*) AS c FROM advances a {cond} {'AND' if cond else 'WHERE'} a.status='Aprobado'",
+        params_prog,
+    )[0]["c"]
+
+    rejected = query(
+        f"SELECT COUNT(*) AS c FROM advances a {cond} {'AND' if cond else 'WHERE'} a.status='Rechazado'",
+        params_prog,
+    )[0]["c"]
+
+    avg_rows = query(
+        f"""SELECT AVG(ai.grade) AS avg_grade, AVG(ai.overall_score) AS avg_score
+            FROM ai_analyses ai JOIN advances a ON a.id=ai.advance_id {cond}""",
+        params_prog,
+    )
+    avg_grade = avg_rows[0]["avg_grade"] if avg_rows else None
+    avg_score = avg_rows[0]["avg_score"] if avg_rows else None
+
+    sev_rows = query(
+        f"""SELECT f.severity, COUNT(*) AS count FROM findings f
+            JOIN ai_analyses ai ON ai.id=f.analysis_id
+            JOIN advances a ON a.id=ai.advance_id {cond}
+            GROUP BY f.severity ORDER BY count DESC""",
+        params_prog,
+    )
+
+    status_rows = query(
+        f"SELECT a.status, COUNT(*) AS count FROM advances a {cond} GROUP BY a.status ORDER BY count DESC",
+        params_prog,
+    )
+
+    grade_dist = []
+    ranges = [(0, 10, "0-10"), (11, 13, "11-13"), (14, 16, "14-16"), (17, 18, "17-18"), (19, 20, "19-20")]
+    for lo, hi, label in ranges:
+        cnt = query(
+            f"SELECT COUNT(*) AS c FROM ai_analyses ai JOIN advances a ON a.id=ai.advance_id {cond} {'AND' if cond else 'WHERE'} ai.grade BETWEEN ? AND ?",
+            list(params_prog) + [lo, hi],
+        )[0]["c"]
+        grade_dist.append({"range": label, "count": cnt})
+
+    return {
+        "total_students": total_students,
+        "total_advances": total_advances,
+        "advances_pending": pending,
+        "advances_approved": approved,
+        "advances_rejected": rejected,
+        "avg_grade": round(avg_grade, 2) if avg_grade else None,
+        "avg_score": round(avg_score, 2) if avg_score else None,
+        "findings_by_severity": [dict(r) for r in sev_rows],
+        "advances_by_status": [dict(r) for r in status_rows],
+        "grades_distribution": grade_dist,
+    }
+
+
+# ── Usuarios ──────────────────────────────────────────────────────────────────
+
+@app.get("/api/users", summary="Listar usuarios", tags=["Usuarios"])
+def list_users(role: Optional[str] = None):
+    cond = "WHERE u.role=?" if role else ""
+    params = (role,) if role else ()
+    rows = query(
+        f"""SELECT u.id, u.name, u.email, u.role, u.program_id, u.advisor_id, u.orcid_id,
+                   u.affiliation, u.expertise, u.created_at, p.name AS program, adv.name AS advisor
+            FROM users u
+            LEFT JOIN programs p ON p.id = u.program_id
+            LEFT JOIN users adv ON adv.id = u.advisor_id
+            {cond} ORDER BY u.id""",
+        params,
+    )
+    return [dict(r) for r in rows]
+
+
+class UserCreate(BaseModel):
+    name: str
+    email: str
+    password: str
+    role: str = "STUDENT"
+    program_id: Optional[int] = None
+    advisor_id: Optional[int] = None
+    orcid_id: Optional[str] = None
+    affiliation: Optional[str] = None
+
+
+@app.post("/api/users", summary="Crear usuario", tags=["Usuarios"])
+def create_user(data: UserCreate):
+    existing = query("SELECT id FROM users WHERE email=?", (data.email,))
+    if existing:
+        raise HTTPException(status_code=400, detail="El email ya está registrado")
+    uid = execute(
+        """INSERT INTO users(name,email,password_hash,role,program_id,advisor_id,orcid_id,affiliation,created_at)
+           VALUES (?,?,?,?,?,?,?,?,?)""",
+        (data.name, data.email, hash_password(data.password), data.role,
+         data.program_id, data.advisor_id, data.orcid_id, data.affiliation, now()),
+    )
+    rows = query("SELECT id,name,email,role,program_id,advisor_id,created_at FROM users WHERE id=?", (uid,))
+    return dict(rows[0])
+
+
+class UserUpdate(BaseModel):
+    name: Optional[str] = None
+    email: Optional[str] = None
+    password: Optional[str] = None
+    role: Optional[str] = None
+    program_id: Optional[int] = None
+    advisor_id: Optional[int] = None
+    orcid_id: Optional[str] = None
+    affiliation: Optional[str] = None
+    expertise: Optional[str] = None
+
+
+@app.patch("/api/users/{user_id}", summary="Actualizar usuario", tags=["Usuarios"])
+def update_user(user_id: int, data: UserUpdate):
+    rows = query("SELECT id FROM users WHERE id=?", (user_id,))
+    if not rows:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    fields = data.model_dump(exclude_none=True)
+    if "password" in fields:
+        fields["password_hash"] = hash_password(fields.pop("password"))
+    if not fields:
+        raise HTTPException(status_code=400, detail="Sin campos para actualizar")
+    set_clause = ", ".join(f"{k}=?" for k in fields)
+    execute(f"UPDATE users SET {set_clause} WHERE id=?", list(fields.values()) + [user_id])
+    result = query(
+        """SELECT u.id, u.name, u.email, u.role, u.program_id, u.advisor_id,
+                  p.name AS program, adv.name AS advisor
+           FROM users u LEFT JOIN programs p ON p.id=u.program_id
+           LEFT JOIN users adv ON adv.id=u.advisor_id WHERE u.id=?""", (user_id,)
+    )
+    return dict(result[0])
+
+
+@app.delete("/api/users/{user_id}", summary="Eliminar usuario", tags=["Usuarios"])
+def delete_user(user_id: int):
+    rows = query("SELECT id FROM users WHERE id=?", (user_id,))
+    if not rows:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    execute("DELETE FROM users WHERE id=?", (user_id,))
+    return {"message": "Usuario eliminado"}
+
+
+# ── Plantillas ────────────────────────────────────────────────────────────────
+
+@app.get("/api/templates", summary="Listar plantillas", tags=["Plantillas"])
+def list_templates():
+    rows = query(
+        """SELECT t.*, p.name AS program_name FROM templates t
+           LEFT JOIN programs p ON p.id = t.program_id ORDER BY t.id"""
+    )
+    return [dict(r) for r in rows]
+
+
+class TemplateData(BaseModel):
+    id: Optional[int] = None
+    program_id: int
+    name: str
+    version: str = "1.0"
+    content: str = ""
+    expected_sections: str = ""
+    rubric_json: str = "{}"
+    active: int = 1
+
+
+@app.post("/api/templates", summary="Guardar plantilla", tags=["Plantillas"])
+def save_template(data: TemplateData):
+    if data.id:
+        execute(
+            """UPDATE templates SET program_id=?,name=?,version=?,content=?,expected_sections=?,rubric_json=?,active=?
+               WHERE id=?""",
+            (data.program_id, data.name, data.version, data.content,
+             data.expected_sections, data.rubric_json, data.active, data.id),
+        )
+        tid = data.id
+    else:
+        tid = execute(
+            """INSERT INTO templates(program_id,name,version,content,expected_sections,rubric_json,active,created_at)
+               VALUES (?,?,?,?,?,?,?,?)""",
+            (data.program_id, data.name, data.version, data.content,
+             data.expected_sections, data.rubric_json, data.active, now()),
+        )
+    rows = query("SELECT t.*, p.name AS program_name FROM templates t LEFT JOIN programs p ON p.id=t.program_id WHERE t.id=?", (tid,))
+    return dict(rows[0])
+
+
+# ── ORCID ─────────────────────────────────────────────────────────────────────
+
+@app.get("/api/orcid/verify/{orcid_id}", summary="Verificar ORCID en registro público", tags=["Usuarios"])
+async def verify_orcid(orcid_id: str):
+    orcid_enabled = os.getenv("ORCID_ENABLED", "false").lower() == "true"
+    if not orcid_enabled:
+        return {
+            "demo": True,
+            "name": "Modo demo",
+            "bio": None,
+            "works": None,
+            "message": "Activa ORCID_ENABLED=true en .env para verificación real contra el registro público.",
+        }
+    try:
+        async with httpx.AsyncClient(timeout=10) as hc:
+            r = await hc.get(
+                f"https://pub.orcid.org/v3.0/{orcid_id}/person",
+                headers={"Accept": "application/json"},
+            )
+            if r.status_code == 404:
+                raise HTTPException(status_code=404, detail="ORCID no encontrado. Verifica que el ID sea correcto.")
+            if r.status_code != 200:
+                raise HTTPException(status_code=502, detail=f"Respuesta inesperada del servidor ORCID: HTTP {r.status_code}")
+
+            data = r.json()
+            name_data = data.get("name") or {}
+            given = (name_data.get("given-names") or {}).get("value", "")
+            family = (name_data.get("family-name") or {}).get("value", "")
+            bio = ((data.get("biography") or {}).get("content") or None)
+            full_name = f"{given} {family}".strip()
+
+            works_count = None
+            try:
+                rw = await hc.get(
+                    f"https://pub.orcid.org/v3.0/{orcid_id}/works",
+                    headers={"Accept": "application/json"},
+                )
+                if rw.status_code == 200:
+                    works_count = len(rw.json().get("group", []))
+            except Exception:
+                pass
+
+            return {"name": full_name, "bio": bio, "works": works_count}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"No se pudo conectar al servidor ORCID: {e}")
+
+
+# ── Expertise ─────────────────────────────────────────────────────────────────
+
+class ExpertiseRequest(BaseModel):
+    thesis_title: str
+    expertise: str
+
+
+@app.post("/api/expertise/validate", summary="Validar compatibilidad asesor–tesis con IA", tags=["Usuarios"])
+def validate_expertise(data: ExpertiseRequest):
+    title = (data.thesis_title or "").strip()
+    expertise = (data.expertise or "").strip()
+    if not title or not expertise:
+        raise HTTPException(status_code=400, detail="Se requiere título de tesis y expertise del asesor.")
+
+    api_key = os.getenv("OPENAI_API_KEY", "").strip()
+    model   = os.getenv("OPENAI_MODEL", "gpt-4o-mini")
+
+    if api_key:
+        try:
+            import openai
+            client_ai = openai.OpenAI(api_key=api_key)
+            prompt = (
+                "Eres un experto en gestión académica universitaria. "
+                "Analiza si el perfil de investigación del asesor es compatible con la tesis del estudiante.\n\n"
+                f"Título de la tesis: {title}\n"
+                f"Expertise / líneas de investigación del asesor: {expertise}\n\n"
+                "Responde SOLO con un objeto JSON con esta estructura exacta:\n"
+                '{"score": <entero 0-100>, "compatible": <true|false>, '
+                '"analysis": "<explicación breve en español, máx 120 palabras>", '
+                '"keywords": ["<término1>", "<término2>", ...]}\n\n'
+                "Donde score indica el % de afinidad temática, compatible=true si score>=50, "
+                "analysis es la justificación, y keywords son los términos clave compartidos."
+            )
+            resp = client_ai.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.2,
+                max_tokens=400,
+                response_format={"type": "json_object"},
+            )
+            result = json.loads(resp.choices[0].message.content)
+            return {
+                "score":      int(result.get("score", 0)),
+                "compatible": bool(result.get("compatible", False)),
+                "analysis":   result.get("analysis", ""),
+                "keywords":   result.get("keywords", []),
+                "engine":     f"OpenAI {model}",
+            }
+        except Exception as exc:
+            print(f"[expertise] OpenAI falló, usando motor local: {exc}")
+
+    # Fallback: coincidencia de palabras clave normalizadas
+    stop = {"de","la","el","los","las","y","o","en","del","un","una","por","para","con","que","es","al","a","su","sus","como"}
+    title_words  = {w for w in title.lower().split()  if len(w) > 3 and w not in stop}
+    expert_words = {w for w in expertise.lower().replace(",", " ").split() if len(w) > 3 and w not in stop}
+    matched = title_words & expert_words
+    score = min(100, round(len(matched) / max(1, len(title_words)) * 100 + len(matched) * 5))
+    return {
+        "score":      score,
+        "compatible": score >= 30,
+        "analysis":   (
+            f"Se encontraron {len(matched)} término(s) en común: {', '.join(matched)}. "
+            if matched else
+            "No se detectaron términos comunes directos entre el título y el expertise. "
+            "Considera activar OPENAI_API_KEY para un análisis semántico más preciso."
+        ),
+        "keywords": list(matched),
+        "engine":   "local",
+    }
+
+
+# ── Copyleaks ─────────────────────────────────────────────────────────────────
+
+@app.get("/api/copyleaks/verify", summary="Verificar conexión con Copyleaks", tags=["Usuarios"])
+async def verify_copyleaks():
+    api_key = os.getenv("COPYLEAKS_API_KEY", "").strip()
+    email   = os.getenv("COPYLEAKS_EMAIL",   "").strip()
+
+    if not api_key or not email:
+        return {
+            "configured": False,
+            "message": "Configura COPYLEAKS_API_KEY y COPYLEAKS_EMAIL en .env para activar la detección externa de plagio.",
+        }
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as hc:
+            # 1 — Autenticar
+            auth = await hc.post(
+                "https://id.copyleaks.com/v3/account/login/api",
+                json={"email": email, "key": api_key},
+            )
+            if not auth.is_success:
+                raise HTTPException(
+                    status_code=502,
+                    detail=f"Autenticación Copyleaks fallida: HTTP {auth.status_code} — verifica API key y email.",
+                )
+            token = auth.json().get("access_token", "")
+            if not token:
+                raise HTTPException(status_code=502, detail="Copyleaks no devolvió un token de acceso.")
+
+            hdrs = {"Authorization": f"Bearer {token}"}
+
+            # 2 — Consultar créditos disponibles
+            credits_r = await hc.get("https://api.copyleaks.com/v3/account/credits", headers=hdrs)
+            credits = None
+            if credits_r.is_success:
+                credits = credits_r.json().get("copyleaksCredits")
+
+            return {
+                "configured": True,
+                "connected": True,
+                "email": email,
+                "credits": credits,
+                "message": "Conexión exitosa con Copyleaks.",
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=503, detail=f"No se pudo conectar a Copyleaks: {e}")
+
+
+# ── Auditoría ─────────────────────────────────────────────────────────────────
+
+@app.get("/api/audit", summary="Logs de auditoría", tags=["Auditoría"])
+def get_audit(limit: int = 200):
+    rows = query(
+        """SELECT al.id, al.user_id, al.action,
+                  al.entity AS resource, al.entity_id AS resource_id,
+                  al.metadata AS details, al.created_at,
+                  u.name AS user_name
+           FROM audit_logs al LEFT JOIN users u ON u.id = al.user_id
+           ORDER BY al.id DESC LIMIT ?""",
+        (limit,),
+    )
+    return [dict(r) for r in rows]

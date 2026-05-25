@@ -1,0 +1,43 @@
+version: "3.8"
+
+# ThesisReview AI v3.0 — Stack completa
+#
+# Uso:
+#   docker compose up --build        # primera vez
+#   docker compose up -d             # modo fondo
+#   docker compose down              # detener
+#
+# Accesos:
+#   Frontend  →  http://localhost:5173  (dev) / http://localhost (prod con nginx)
+#   API       →  http://localhost:8000/docs
+
+services:
+
+  api:
+    build: .
+    container_name: thesisreview_api
+    ports:
+      - "8000:8000"
+    command: uvicorn api_server:app --host 0.0.0.0 --port 8000
+    volumes:
+      - thesis_data:/app/data
+    environment:
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4o-mini}
+      - CROSSREF_ENABLED=${CROSSREF_ENABLED:-true}
+      - ORCID_ENABLED=${ORCID_ENABLED:-true}
+      - COPYLEAKS_API_KEY=${COPYLEAKS_API_KEY}
+      - COPYLEAKS_EMAIL=${COPYLEAKS_EMAIL}
+      - APP_SECRET=${APP_SECRET}
+      - MAX_FILE_MB=${MAX_FILE_MB:-20}
+      - DB_PATH=${DB_PATH:-data/thesis_review.db}
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  thesis_data:
+    driver: local
