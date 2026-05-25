@@ -163,6 +163,7 @@ CREATE TABLE IF NOT EXISTS ai_analyses (
     overall_score REAL,
     grade REAL,
     executive_summary TEXT,
+    section_comparison TEXT,
     model_used TEXT,
     processing_ms INTEGER,
     created_at TEXT NOT NULL,
@@ -300,6 +301,7 @@ _TABLES_PG = [
         overall_score FLOAT,
         grade FLOAT,
         executive_summary TEXT,
+        section_comparison TEXT,
         model_used TEXT,
         processing_ms INTEGER,
         created_at TEXT NOT NULL
@@ -385,8 +387,20 @@ def init_db():
         if USE_PG:
             for stmt in _TABLES_PG:
                 cur.execute(stmt)
+            # Migration: add section_comparison if missing
+            try:
+                cur.execute("ALTER TABLE ai_analyses ADD COLUMN section_comparison TEXT")
+                conn.commit()
+            except Exception:
+                conn.rollback()
         else:
             conn.executescript(_TABLES_SQLITE)
+            # Migration: add section_comparison if missing
+            try:
+                conn.execute("ALTER TABLE ai_analyses ADD COLUMN section_comparison TEXT")
+                conn.commit()
+            except Exception:
+                pass
         conn.commit()
     finally:
         conn.close()

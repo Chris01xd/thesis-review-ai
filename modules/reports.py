@@ -1,5 +1,6 @@
 
 import os
+import json
 from datetime import datetime
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
@@ -52,6 +53,54 @@ def generate_review_pdf(advance_id: int) -> str:
         story.append(Paragraph("Resumen ejecutivo de IA", styles["Heading2"]))
         story.append(Paragraph(ana[0]["executive_summary"], styles["BodyText"]))
         story.append(Spacer(1, 12))
+
+        # ── Comparación con esquema institucional ─────────────────────────────
+        sec_comp_raw = ana[0].get("section_comparison") or "[]"
+        try:
+            sec_comp = json.loads(sec_comp_raw)
+        except Exception:
+            sec_comp = []
+
+        if sec_comp:
+            story.append(Paragraph("Comparación con esquema institucional", styles["Heading2"]))
+            present_count = sum(1 for s in sec_comp if s.get("present"))
+            total_count = len(sec_comp)
+            story.append(Paragraph(
+                f"Secciones encontradas: {present_count} de {total_count} "
+                f"({round(present_count/total_count*100)}% de cumplimiento estructural)",
+                styles["Normal"]
+            ))
+            story.append(Spacer(1, 6))
+
+            comp_rows = [["#", "Sección requerida", "Estado"]]
+            for i, s in enumerate(sec_comp, 1):
+                if s.get("present") and s.get("optional"):
+                    estado = "Opcional (no penaliza)"
+                elif s.get("present"):
+                    estado = "✓ Presente"
+                else:
+                    estado = "✗ Ausente"
+                comp_rows.append([str(i), s.get("section", "-"), estado])
+
+            comp_table = Table(comp_rows, colWidths=[25, 290, 170])
+            comp_style = [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e3a5f")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTSIZE", (0, 0), (-1, -1), 8),
+                ("GRID", (0, 0), (-1, -1), 0.4, colors.grey),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ]
+            for i, s in enumerate(sec_comp, 1):
+                if s.get("present") and not s.get("optional"):
+                    comp_style.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor("#d4edda")))
+                elif s.get("optional"):
+                    comp_style.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor("#fff3cd")))
+                else:
+                    comp_style.append(("BACKGROUND", (0, i), (-1, i), colors.HexColor("#f8d7da")))
+            comp_table.setStyle(TableStyle(comp_style))
+            story.append(comp_table)
+            story.append(Spacer(1, 14))
+
     story.append(Paragraph("Hallazgos principales", styles["Heading2"]))
     for f in findings[:20]:
         story.append(Paragraph(

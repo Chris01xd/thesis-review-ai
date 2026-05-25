@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getAdvance, getFindings, getCitations, getSimilarity } from '@/api'
-import type { AIAnalysis } from '@/types'
+import type { AIAnalysis, SectionComparison } from '@/types'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -11,10 +11,10 @@ import { SeverityBadge } from '@/components/shared/SeverityBadge'
 import { ScoreRing } from '@/components/shared/ScoreRing'
 import { LoadingSpinner, PageError } from '@/components/shared/LoadingSpinner'
 import { formatDate, gradeColor } from '@/lib/utils'
-import { ArrowLeft, FileText, Brain, BookOpen, Copy } from 'lucide-react'
+import { ArrowLeft, FileText, Brain, BookOpen, Copy, LayoutList } from 'lucide-react'
 import type { Severity } from '@/types'
 
-type Tab = 'analysis' | 'findings' | 'citations' | 'similarity'
+type Tab = 'analysis' | 'schema' | 'findings' | 'citations' | 'similarity'
 
 export default function AdvanceDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -33,6 +33,7 @@ export default function AdvanceDetailPage() {
 
   const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: 'analysis',   label: 'Análisis IA',   icon: <Brain size={15} /> },
+    { key: 'schema',     label: 'Esquema',        icon: <LayoutList size={15} /> },
     { key: 'findings',   label: 'Hallazgos',     icon: <FileText size={15} /> },
     { key: 'citations',  label: 'Citas',          icon: <BookOpen size={15} /> },
     { key: 'similarity', label: 'Similitud',      icon: <Copy size={15} /> },
@@ -97,6 +98,7 @@ export default function AdvanceDetailPage() {
 
       {/* Tab content */}
       {tab === 'analysis'   && <AnalysisTab analysis={analysis} />}
+      {tab === 'schema'     && <SchemaTab analysis={analysis} />}
       {tab === 'findings'   && <FindingsTab advId={advId} />}
       {tab === 'citations'  && <CitationsTab advId={advId} />}
       {tab === 'similarity' && <SimilarityTab advId={advId} />}
@@ -137,6 +139,105 @@ function AnalysisTab({ analysis }: { analysis: AIAnalysis | null }) {
         </CardContent>
       </Card>
       <p className="text-xs text-slate-400">Modelo: {analysis.model_used} · Procesado en {analysis.processing_ms}ms · {formatDate(analysis.created_at)}</p>
+    </div>
+  )
+}
+
+function SchemaTab({ analysis }: { analysis: AIAnalysis | null }) {
+  if (!analysis) return (
+    <Card><CardContent className="py-10 text-center text-slate-400">Sin análisis IA disponible — ejecuta el análisis primero</CardContent></Card>
+  )
+
+  let sections: SectionComparison[] = []
+  try {
+    sections = analysis.section_comparison ? JSON.parse(analysis.section_comparison) : []
+  } catch {
+    sections = []
+  }
+
+  if (!sections.length) return (
+    <Card><CardContent className="py-10 text-center text-slate-400">No hay datos de comparación de esquema disponibles</CardContent></Card>
+  )
+
+  const present  = sections.filter(s => s.present && !s.optional).length
+  const optional = sections.filter(s => s.optional).length
+  const missing  = sections.filter(s => !s.present).length
+  const total    = sections.length
+  const pct      = Math.round((present + optional) / total * 100)
+
+  return (
+    <div className="space-y-4">
+      {/* Summary bar */}
+      <Card>
+        <CardContent className="py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+            <div>
+              <h3 className="font-semibold text-slate-800">Comparación con esquema institucional</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {present + optional} de {total} secciones encontradas · {pct}% de cumplimiento estructural
+              </p>
+            </div>
+            <div className="flex gap-3 text-sm">
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-emerald-500 inline-block" />
+                <span className="text-slate-600">Presente ({present})</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-amber-400 inline-block" />
+                <span className="text-slate-600">Opcional ({optional})</span>
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-full bg-red-500 inline-block" />
+                <span className="text-slate-600">Ausente ({missing})</span>
+              </span>
+            </div>
+          </div>
+          <Progress
+            value={pct}
+            color={pct >= 80 ? 'bg-emerald-500' : pct >= 60 ? 'bg-blue-500' : pct >= 40 ? 'bg-amber-500' : 'bg-red-500'}
+          />
+        </CardContent>
+      </Card>
+
+      {/* Section checklist */}
+      <Card>
+        <CardContent className="p-0">
+          {sections.map((s, i) => (
+            <div
+              key={i}
+              className={`flex items-center gap-3 px-4 py-3 ${i < sections.length - 1 ? 'border-b border-slate-100' : ''} ${
+                s.present && !s.optional ? 'bg-emerald-50/40' :
+                s.optional ? 'bg-amber-50/40' : 'bg-red-50/40'
+              }`}
+            >
+              <span className="text-xs text-slate-400 w-5 text-right shrink-0">{i + 1}</span>
+              <span className={`text-lg shrink-0 ${s.present && !s.optional ? 'text-emerald-600' : s.optional ? 'text-amber-500' : 'text-red-500'}`}>
+                {s.present && !s.optional ? '✓' : s.optional ? '◎' : '✗'}
+              </span>
+              <span className={`flex-1 text-sm ${s.present && !s.optional ? 'text-slate-800' : s.optional ? 'text-slate-700' : 'text-slate-800 font-medium'}`}>
+                {s.section}
+              </span>
+              {s.optional && (
+                <span className="text-xs text-amber-600 bg-amber-100 px-2 py-0.5 rounded-full shrink-0">Opcional</span>
+              )}
+              {!s.present && !s.optional && (
+                <span className="text-xs text-red-600 bg-red-100 px-2 py-0.5 rounded-full shrink-0">Faltante</span>
+              )}
+            </div>
+          ))}
+        </CardContent>
+      </Card>
+
+      {missing > 0 && (
+        <Card className="border-amber-200 bg-amber-50">
+          <CardContent className="py-3">
+            <p className="text-sm text-amber-800">
+              <strong>{missing} sección{missing > 1 ? 'es' : ''} faltante{missing > 1 ? 's' : ''}.</strong>{' '}
+              Verifica que el documento incluya estos encabezados de forma explícita o que hayas seleccionado la plantilla correcta para el tipo de avance.
+            </p>
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

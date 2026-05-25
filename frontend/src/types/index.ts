@@ -48,6 +48,12 @@ export type AdvanceStatus =
   | 'Aprobado'
   | 'Rechazado'
 
+export interface SectionComparison {
+  section: string
+  present: boolean
+  optional: boolean
+}
+
 export interface AIAnalysis {
   id: number
   advance_id: number
@@ -58,6 +64,7 @@ export interface AIAnalysis {
   overall_score: number
   grade: number
   executive_summary: string
+  section_comparison: string | null
   model_used: string
   processing_ms: number
   created_at: string

@@ -74,6 +74,19 @@ Documento:
 
         result["processingMs"] = int((time.time() - t0) * 1000)
         result["modelUsed"]    = f"OpenAI {model}"
+
+        # Compute section comparison locally (reliable, template-based)
+        norm_text_local = normalize_text(text or "")
+        advance_norm_local = normalize_text(advance_type)
+        sc = []
+        for sec in expected_sections:
+            ok = section_present(sec, text or "", norm_text_local, advance_type)
+            sec_key = normalize_text(sec)
+            optional = (not ok
+                        and ("capitulo 1" in advance_norm_local or "proyecto" in advance_norm_local or "avance" in advance_norm_local)
+                        and sec_key in {normalize_text(s) for s in OPTIONAL_FOR_PROJECT})
+            sc.append({"section": sec, "present": ok or optional, "optional": optional})
+        result["sectionComparison"] = sc
         return result
 
     except Exception as exc:
@@ -284,6 +297,13 @@ def local_agentic_analysis(text: str, expected_sections: List[str], rubric: Dict
             "recommendation": "Mantener la trazabilidad entre objetivos, resultados y conclusiones."
         })
 
+    section_comparison = []
+    for sec in expected_sections:
+        sec_key = normalize_text(sec)
+        is_optional = sec_key in {normalize_text(s) for s in optional_not_penalized}
+        is_present = sec.lower() in present or is_optional
+        section_comparison.append({"section": sec, "present": is_present, "optional": is_optional})
+
     summary = (
         f"El avance presenta un cumplimiento estimado de {overall:.1f}%. "
         f"La estructura alcanza {structure_score:.1f}%, el contenido {content_score:.1f}%, "
@@ -302,6 +322,7 @@ def local_agentic_analysis(text: str, expected_sections: List[str], rubric: Dict
         "grade": grade,
         "executiveSummary": summary,
         "findings": findings,
+        "sectionComparison": section_comparison,
         "processingMs": int((time.time()-start)*1000),
         "modelUsed": "Agente local académico v4 + detección tolerante por equivalencias"
     }

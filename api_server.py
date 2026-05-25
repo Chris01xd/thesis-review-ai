@@ -291,11 +291,13 @@ def _run_analysis(advance_id: int, tpl: dict, actor_id: int):
     aid = execute(
         """INSERT INTO ai_analyses(advance_id,structure_score,content_score,form_score,
                                    originality_score,overall_score,grade,executive_summary,
-                                   model_used,processing_ms,created_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                                   section_comparison,model_used,processing_ms,created_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
         (advance_id, result["scores"]["structure"], result["scores"]["content"],
          result["scores"]["form"], result["scores"]["originality"], result["scores"]["overall"],
-         result["grade"], result["executiveSummary"], result.get("model", "local"), ms, now()),
+         result["grade"], result["executiveSummary"],
+         json.dumps(result.get("sectionComparison", []), ensure_ascii=False),
+         result.get("modelUsed", "local"), ms, now()),
     )
 
     for f in result.get("findings", []):
