@@ -7,18 +7,17 @@ from dotenv import load_dotenv
 load_dotenv()
 
 DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
-DB_PATH      = os.getenv("DB_PATH", os.path.join("data", "thesis_review.db"))
-USE_PG       = bool(DATABASE_URL)
+DB_PATH = os.getenv("DB_PATH", os.path.join("data", "thesis_review.db"))
+USE_PG = bool(DATABASE_URL)
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ─────────────────────────────────────────────────────────────────────────────
 
 def now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
+
 def hash_password(password: str) -> str:
     return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
 
 def check_password(password: str, hashed: str) -> bool:
     try:
@@ -26,21 +25,23 @@ def check_password(password: str, hashed: str) -> bool:
     except Exception:
         return False
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Conexión
-# ─────────────────────────────────────────────────────────────────────────────
 
 def connect():
     if USE_PG:
         import psycopg2
         import psycopg2.extras
+
         url = DATABASE_URL
-        # Render a veces devuelve "postgres://" — psycopg2 necesita "postgresql://"
         if url.startswith("postgres://"):
             url = url.replace("postgres://", "postgresql://", 1)
-        conn = psycopg2.connect(url, cursor_factory=psycopg2.extras.RealDictCursor)
+
+        conn = psycopg2.connect(
+            url,
+            cursor_factory=psycopg2.extras.RealDictCursor
+        )
         conn.autocommit = False
         return conn
+
     else:
         import sqlite3
         os.makedirs("data", exist_ok=True)
@@ -48,13 +49,10 @@ def connect():
         conn.row_factory = sqlite3.Row
         return conn
 
-# ─────────────────────────────────────────────────────────────────────────────
-# API pública: query / execute / log
-# ─────────────────────────────────────────────────────────────────────────────
 
 def _to_pg(sql: str) -> str:
-    """Convierte placeholders ? → %s para psycopg2."""
     return sql.replace("?", "%s")
+
 
 def query(sql, params=()):
     conn = connect()
@@ -66,38 +64,50 @@ def query(sql, params=()):
     finally:
         conn.close()
 
+
 def execute(sql, params=()):
     conn = connect()
     try:
         cur = conn.cursor()
+
         if USE_PG:
-            # Extrae la cláusula RETURNING si existe, o la agrega en INSERT
             pg_sql = _to_pg(sql)
+
             if sql.strip().upper().startswith("INSERT") and "RETURNING" not in sql.upper():
                 pg_sql = pg_sql.rstrip().rstrip(";") + " RETURNING id"
+
             cur.execute(pg_sql, params)
+
             if sql.strip().upper().startswith("INSERT"):
                 result = cur.fetchone()
                 last = result["id"] if result else None
             else:
                 last = None
+
         else:
             cur.execute(sql, params)
             last = cur.lastrowid
+
         conn.commit()
         return last
+
     finally:
         conn.close()
+
 
 def log(user_id, action, entity=None, entity_id=None, metadata=None):
     execute(
         "INSERT INTO audit_logs(user_id,action,entity,entity_id,metadata,created_at) VALUES (?,?,?,?,?,?)",
-        (user_id, action, entity, entity_id, json.dumps(metadata or {}, ensure_ascii=False), now()),
+        (
+            user_id,
+            action,
+            entity,
+            entity_id,
+            json.dumps(metadata or {}, ensure_ascii=False),
+            now(),
+        ),
     )
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Schema
-# ─────────────────────────────────────────────────────────────────────────────
 
 _TABLES_SQLITE = """
 CREATE TABLE IF NOT EXISTS programs (
@@ -105,6 +115,7 @@ CREATE TABLE IF NOT EXISTS programs (
     name TEXT NOT NULL UNIQUE,
     created_at TEXT NOT NULL
 );
+
 CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -120,6 +131,7 @@ CREATE TABLE IF NOT EXISTS users (
     FOREIGN KEY(program_id) REFERENCES programs(id),
     FOREIGN KEY(advisor_id) REFERENCES users(id)
 );
+
 CREATE TABLE IF NOT EXISTS templates (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     program_id INTEGER NOT NULL,
@@ -132,6 +144,7 @@ CREATE TABLE IF NOT EXISTS templates (
     created_at TEXT NOT NULL,
     FOREIGN KEY(program_id) REFERENCES programs(id)
 );
+
 CREATE TABLE IF NOT EXISTS advances (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     student_id INTEGER NOT NULL,
@@ -153,6 +166,7 @@ CREATE TABLE IF NOT EXISTS advances (
     FOREIGN KEY(program_id) REFERENCES programs(id),
     FOREIGN KEY(template_id) REFERENCES templates(id)
 );
+
 CREATE TABLE IF NOT EXISTS ai_analyses (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     advance_id INTEGER NOT NULL UNIQUE,
@@ -169,6 +183,7 @@ CREATE TABLE IF NOT EXISTS ai_analyses (
     created_at TEXT NOT NULL,
     FOREIGN KEY(advance_id) REFERENCES advances(id)
 );
+
 CREATE TABLE IF NOT EXISTS findings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     analysis_id INTEGER NOT NULL,
@@ -185,6 +200,7 @@ CREATE TABLE IF NOT EXISTS findings (
     created_at TEXT NOT NULL,
     FOREIGN KEY(analysis_id) REFERENCES ai_analyses(id)
 );
+
 CREATE TABLE IF NOT EXISTS reviews (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     advance_id INTEGER NOT NULL UNIQUE,
@@ -195,6 +211,7 @@ CREATE TABLE IF NOT EXISTS reviews (
     reviewed_at TEXT,
     created_at TEXT NOT NULL
 );
+
 CREATE TABLE IF NOT EXISTS plagiarism_results (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     advance_id INTEGER NOT NULL,
@@ -204,6 +221,7 @@ CREATE TABLE IF NOT EXISTS plagiarism_results (
     status TEXT,
     created_at TEXT NOT NULL
 );
+
 CREATE TABLE IF NOT EXISTS citations (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     advance_id INTEGER NOT NULL,
@@ -217,6 +235,7 @@ CREATE TABLE IF NOT EXISTS citations (
     suggestion TEXT,
     created_at TEXT NOT NULL
 );
+
 CREATE TABLE IF NOT EXISTS notifications (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -224,6 +243,7 @@ CREATE TABLE IF NOT EXISTS notifications (
     read_status INTEGER DEFAULT 0,
     created_at TEXT NOT NULL
 );
+
 CREATE TABLE IF NOT EXISTS audit_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER,
@@ -233,6 +253,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     metadata TEXT,
     created_at TEXT NOT NULL
 );
+
 CREATE TABLE IF NOT EXISTS agent_jobs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -244,13 +265,17 @@ CREATE TABLE IF NOT EXISTS agent_jobs (
 );
 """
 
+
 _TABLES_PG = [
-    """CREATE TABLE IF NOT EXISTS programs (
+    """
+    CREATE TABLE IF NOT EXISTS programs (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL UNIQUE,
         created_at TEXT NOT NULL
-    )""",
-    """CREATE TABLE IF NOT EXISTS users (
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         email TEXT NOT NULL UNIQUE,
@@ -262,8 +287,10 @@ _TABLES_PG = [
         affiliation TEXT,
         expertise TEXT,
         created_at TEXT NOT NULL
-    )""",
-    """CREATE TABLE IF NOT EXISTS templates (
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS templates (
         id SERIAL PRIMARY KEY,
         program_id INTEGER NOT NULL,
         name TEXT NOT NULL,
@@ -273,8 +300,10 @@ _TABLES_PG = [
         rubric_json TEXT NOT NULL,
         active INTEGER DEFAULT 1,
         created_at TEXT NOT NULL
-    )""",
-    """CREATE TABLE IF NOT EXISTS advances (
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS advances (
         id SERIAL PRIMARY KEY,
         student_id INTEGER NOT NULL,
         advisor_id INTEGER,
@@ -290,8 +319,10 @@ _TABLES_PG = [
         page_count INTEGER,
         status TEXT DEFAULT 'Pendiente',
         created_at TEXT NOT NULL
-    )""",
-    """CREATE TABLE IF NOT EXISTS ai_analyses (
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS ai_analyses (
         id SERIAL PRIMARY KEY,
         advance_id INTEGER NOT NULL UNIQUE,
         structure_score FLOAT,
@@ -305,8 +336,10 @@ _TABLES_PG = [
         model_used TEXT,
         processing_ms INTEGER,
         created_at TEXT NOT NULL
-    )""",
-    """CREATE TABLE IF NOT EXISTS findings (
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS findings (
         id SERIAL PRIMARY KEY,
         analysis_id INTEGER NOT NULL,
         type TEXT,
@@ -320,8 +353,10 @@ _TABLES_PG = [
         human_action TEXT DEFAULT 'Pendiente',
         human_comment TEXT,
         created_at TEXT NOT NULL
-    )""",
-    """CREATE TABLE IF NOT EXISTS reviews (
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS reviews (
         id SERIAL PRIMARY KEY,
         advance_id INTEGER NOT NULL UNIQUE,
         reviewer_id INTEGER NOT NULL,
@@ -330,8 +365,10 @@ _TABLES_PG = [
         status TEXT,
         reviewed_at TEXT,
         created_at TEXT NOT NULL
-    )""",
-    """CREATE TABLE IF NOT EXISTS plagiarism_results (
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS plagiarism_results (
         id SERIAL PRIMARY KEY,
         advance_id INTEGER NOT NULL,
         compared_advance_id INTEGER,
@@ -339,8 +376,10 @@ _TABLES_PG = [
         section_ref TEXT,
         status TEXT,
         created_at TEXT NOT NULL
-    )""",
-    """CREATE TABLE IF NOT EXISTS citations (
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS citations (
         id SERIAL PRIMARY KEY,
         advance_id INTEGER NOT NULL,
         raw_reference TEXT,
@@ -352,15 +391,19 @@ _TABLES_PG = [
         source TEXT,
         suggestion TEXT,
         created_at TEXT NOT NULL
-    )""",
-    """CREATE TABLE IF NOT EXISTS notifications (
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS notifications (
         id SERIAL PRIMARY KEY,
         user_id INTEGER NOT NULL,
         message TEXT NOT NULL,
         read_status INTEGER DEFAULT 0,
         created_at TEXT NOT NULL
-    )""",
-    """CREATE TABLE IF NOT EXISTS audit_logs (
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS audit_logs (
         id SERIAL PRIMARY KEY,
         user_id INTEGER,
         action TEXT NOT NULL,
@@ -368,8 +411,10 @@ _TABLES_PG = [
         entity_id INTEGER,
         metadata TEXT,
         created_at TEXT NOT NULL
-    )""",
-    """CREATE TABLE IF NOT EXISTS agent_jobs (
+    )
+    """,
+    """
+    CREATE TABLE IF NOT EXISTS agent_jobs (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
         advance_id INTEGER,
@@ -377,83 +422,233 @@ _TABLES_PG = [
         result TEXT,
         created_at TEXT NOT NULL,
         finished_at TEXT
-    )""",
+    )
+    """,
 ]
+
 
 def init_db():
     conn = connect()
+
     try:
         cur = conn.cursor()
+
         if USE_PG:
             for stmt in _TABLES_PG:
                 cur.execute(stmt)
-            # Migration: add section_comparison if missing
+
+            conn.commit()
+
             try:
                 cur.execute("ALTER TABLE ai_analyses ADD COLUMN section_comparison TEXT")
                 conn.commit()
             except Exception:
                 conn.rollback()
+
         else:
             conn.executescript(_TABLES_SQLITE)
-            # Migration: add section_comparison if missing
+            conn.commit()
+
             try:
                 conn.execute("ALTER TABLE ai_analyses ADD COLUMN section_comparison TEXT")
                 conn.commit()
             except Exception:
                 pass
-        conn.commit()
+
     finally:
         conn.close()
+
     seed_data()
+
 
 def seed_data():
     rows = query("SELECT COUNT(*) AS c FROM programs")
-    if rows[0]["c"] > 0:
+
+    if rows and rows[0]["c"] > 0:
         return
 
-    execute("INSERT INTO programs(name, created_at) VALUES (?,?)", ("Maestría en Educación", now()))
-    execute("INSERT INTO programs(name, created_at) VALUES (?,?)", ("Maestría en Ingeniería", now()))
+    execute(
+        "INSERT INTO programs(name, created_at) VALUES (?,?)",
+        ("Maestría en Educación", now()),
+    )
+
+    execute(
+        "INSERT INTO programs(name, created_at) VALUES (?,?)",
+        ("Maestría en Ingeniería", now()),
+    )
 
     hp = hash_password("123456")
+
     users = [
-        ("Administrador General", "admin@tesis.edu",       "ADMIN",       None, None, None,                   None,             None),
-        ("María Castillo",        "coordinador@tesis.edu", "COORDINATOR", 1,    None, None,                   None,             None),
-        ("Dr. Pérez",             "asesor@tesis.edu",      "ADVISOR",     1,    None, "0000-0002-1825-0097",  "Universidad Demo","educación, metodología de investigación, evaluación"),
-        ("Torres Kevin",          "estudiante@tesis.edu",  "STUDENT",     1,    3,    None,                   None,             None),
+        (
+            "Administrador General",
+            "admin@tesis.edu",
+            "ADMIN",
+            None,
+            None,
+            None,
+            None,
+            None,
+        ),
+        (
+            "María Castillo",
+            "coordinador@tesis.edu",
+            "COORDINATOR",
+            1,
+            None,
+            None,
+            None,
+            None,
+        ),
+        (
+            "Dr. Pérez",
+            "asesor@tesis.edu",
+            "ADVISOR",
+            1,
+            None,
+            "0000-0002-1825-0097",
+            "Universidad Demo",
+            "educación, metodología de investigación, evaluación",
+        ),
+        (
+            "Torres Kevin",
+            "estudiante@tesis.edu",
+            "STUDENT",
+            1,
+            3,
+            None,
+            None,
+            None,
+        ),
     ]
+
     for name, email, role, program_id, advisor_id, orcid, aff, exp in users:
         execute(
-            "INSERT INTO users(name,email,password_hash,role,program_id,advisor_id,orcid_id,affiliation,expertise,created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
-            (name, email, hp, role, program_id, advisor_id, orcid, aff, exp, now()),
+            """
+            INSERT INTO users(
+                name,email,password_hash,role,program_id,advisor_id,
+                orcid_id,affiliation,expertise,created_at
+            ) VALUES (?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                name,
+                email,
+                hp,
+                role,
+                program_id,
+                advisor_id,
+                orcid,
+                aff,
+                exp,
+                now(),
+            ),
         )
 
-    expected = "|".join([
-        "Carátula","Índice","Resumen","Introducción","Planteamiento del problema",
-        "Objetivos","Justificación","Marco teórico","Antecedentes",
-        "Hipótesis","Metodología","Resultados","Discusión","Conclusiones","Referencias",
-    ])
-    rubric = json.dumps({"estructura":30,"contenido":40,"forma":20,"originalidad":10,"nota_maxima":20,"umbral_alerta":65})
+    expected = "|".join(
+        [
+            "Carátula",
+            "Índice",
+            "Resumen",
+            "Introducción",
+            "Planteamiento del problema",
+            "Objetivos",
+            "Justificación",
+            "Marco teórico",
+            "Antecedentes",
+            "Hipótesis",
+            "Metodología",
+            "Resultados",
+            "Discusión",
+            "Conclusiones",
+            "Referencias",
+        ]
+    )
+
+    rubric = json.dumps(
+        {
+            "estructura": 30,
+            "contenido": 40,
+            "forma": 20,
+            "originalidad": 10,
+            "nota_maxima": 20,
+            "umbral_alerta": 65,
+        },
+        ensure_ascii=False,
+    )
+
     template_text = (
-        "Documento patrón institucional de tesis. Estructura obligatoria: Carátula, Índice, "
-        "Resumen, Introducción, Planteamiento del problema, Objetivos, Justificación, Marco teórico, "
-        "Antecedentes, Hipótesis, Metodología, Resultados, Discusión, Conclusiones y Referencias. "
+        "Documento patrón institucional de tesis. Estructura obligatoria: "
+        "Carátula, Índice, Resumen, Introducción, Planteamiento del problema, "
+        "Objetivos, Justificación, Marco teórico, Antecedentes, Hipótesis, "
+        "Metodología, Resultados, Discusión, Conclusiones y Referencias. "
         "Criterios: lenguaje académico, coherencia, citas APA 7ma edición."
     )
-    for pid, name in [(1, "Patrón Maestría Educación"), (2, "Patrón Maestría Ingeniería")]:
+
+    for pid, name in [
+        (1, "Patrón Maestría Educación"),
+        (2, "Patrón Maestría Ingeniería"),
+    ]:
         execute(
-            "INSERT INTO templates(program_id,name,version,content,expected_sections,rubric_json,active,created_at) VALUES (?,?,?,?,?,?,1,?)",
-            (pid, name, "v1.0", template_text, expected, rubric, now()),
+            """
+            INSERT INTO templates(
+                program_id,name,version,content,expected_sections,
+                rubric_json,active,created_at
+            ) VALUES (?,?,?,?,?,?,1,?)
+            """,
+            (
+                pid,
+                name,
+                "v1.0",
+                template_text,
+                expected,
+                rubric,
+                now(),
+            ),
         )
 
-    expected_proj = "|".join([
-        "Carátula","Jurado dictaminador","Dedicatoria","Agradecimiento","Índice",
-        "Lista de figuras","Lista de tablas","Presentación","Resumen","Abstract",
-        "Introducción","Planteamiento del problema","Antecedentes","Marco teórico",
-        "Justificación","Formulación del problema","Hipótesis","Objetivos","Limitaciones",
-        "Referencias","Matriz de consistencia","Matriz de operacionalización","Anexos",
-    ])
+    expected_proj = "|".join(
+        [
+            "Carátula",
+            "Jurado dictaminador",
+            "Dedicatoria",
+            "Agradecimiento",
+            "Índice",
+            "Lista de figuras",
+            "Lista de tablas",
+            "Presentación",
+            "Resumen",
+            "Abstract",
+            "Introducción",
+            "Planteamiento del problema",
+            "Antecedentes",
+            "Marco teórico",
+            "Justificación",
+            "Formulación del problema",
+            "Hipótesis",
+            "Objetivos",
+            "Limitaciones",
+            "Referencias",
+            "Matriz de consistencia",
+            "Matriz de operacionalización",
+            "Anexos",
+        ]
+    )
+
     execute(
-        "INSERT INTO templates(program_id,name,version,content,expected_sections,rubric_json,active,created_at) VALUES (?,?,?,?,?,?,?,?)",
-        (2, "Patrón Proyecto de Tesis Pregrado / Capítulo I", "v1.0",
-         "Plantilla para proyecto de tesis o avance de Capítulo I.", expected_proj, rubric, 1, now()),
+        """
+        INSERT INTO templates(
+            program_id,name,version,content,expected_sections,
+            rubric_json,active,created_at
+        ) VALUES (?,?,?,?,?,?,?,?)
+        """,
+        (
+            2,
+            "Patrón Proyecto de Tesis Pregrado / Capítulo I",
+            "v1.0",
+            "Plantilla para proyecto de tesis o avance de Capítulo I.",
+            expected_proj,
+            rubric,
+            1,
+            now(),
+        ),
     )
