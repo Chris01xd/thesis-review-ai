@@ -12,7 +12,7 @@ from modules.ai_engine import local_agentic_analysis, agent_plan_for_document
 from modules.plagiarism import run_similarity_check
 from modules.citations import validate_citations
 from modules.reports import generate_review_pdf, generate_similarity_pdf, generate_ai_detection_pdf
-from modules.email_service import send_review_email, send_batch_review_email
+from modules.email_service import send_review_email, send_batch_review_email, send_test_email
 from modules.thesis_generator import generate_thesis
 from modules.open_similarity import run_open_similarity
 from modules.ai_detector import run_ai_detection
@@ -842,6 +842,18 @@ async def verify_copyleaks():
         raise
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"No se pudo conectar a Copyleaks: {e}")
+
+
+# ── Email ─────────────────────────────────────────────────────────────────────
+
+@app.post("/api/email/test", summary="Enviar correo de prueba", tags=["Sistema"])
+def test_email():
+    """
+    Envía un correo de prueba a EMAIL_RECIPIENT y retorna el diagnóstico completo.
+    Útil para verificar que SMTP funciona en producción.
+    """
+    result = send_test_email()
+    return result
 
 
 # ── Auditoría ─────────────────────────────────────────────────────────────────

@@ -2,6 +2,7 @@
 import os
 import json
 import smtplib
+import traceback
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
@@ -9,25 +10,35 @@ from datetime import datetime
 from .database import query
 
 
-# ── Configuración SMTP desde .env ─────────────────────────────────────────────
-SMTP_HOST     = os.getenv("SMTP_HOST", "smtp.gmail.com")
-SMTP_PORT     = int(os.getenv("SMTP_PORT", "587"))
-EMAIL_SENDER  = os.getenv("EMAIL_SENDER", "")
-EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD", "")
+# ── Configuración SMTP desde entorno ─────────────────────────────────────────
+SMTP_HOST       = os.getenv("SMTP_HOST",       "smtp.gmail.com")
+SMTP_PORT       = int(os.getenv("SMTP_PORT",   "587"))
+EMAIL_SENDER    = os.getenv("EMAIL_SENDER",    "")
+EMAIL_PASSWORD  = os.getenv("EMAIL_PASSWORD",  "")
 EMAIL_RECIPIENT = os.getenv("EMAIL_RECIPIENT", "christiannoriegaoliva2020@gmail.com")
+SENDGRID_KEY    = os.getenv("SENDGRID_API_KEY", "")
+
+# Log de configuración al cargar el módulo
+print("[email_service] == Configuracion cargada ==")
+print(f"[email_service]   SMTP_HOST      : {SMTP_HOST}")
+print(f"[email_service]   SMTP_PORT      : {SMTP_PORT}")
+print(f"[email_service]   EMAIL_SENDER   : {('OK ' + EMAIL_SENDER) if EMAIL_SENDER else 'NO CONFIGURADO'}")
+print(f"[email_service]   EMAIL_PASSWORD : {('OK (' + str(len(EMAIL_PASSWORD)) + ' chars)') if EMAIL_PASSWORD else 'NO CONFIGURADA'}")
+print(f"[email_service]   EMAIL_RECIPIENT: {EMAIL_RECIPIENT}")
+print(f"[email_service]   SENDGRID_KEY   : {'OK configurada' if SENDGRID_KEY else 'no configurada (opcional)'}")
+print("[email_service] ===============================")
 
 
-def _send(subject: str, html_body: str, recipients: list[str], attachments: list[str] | None = None):
-    """Envía el correo HTML con adjuntos opcionales. Silencia errores para no bloquear el flujo."""
+def _send_via_smtp(subject: str, html_body: str, recipients: list[str],
+                   attachments: list[str] | None = None) -> tuple[bool, str]:
+    """Intenta enviar por SMTP. Retorna (éxito, mensaje)."""
     if not EMAIL_SENDER or not EMAIL_PASSWORD:
-        print("[email_service] EMAIL_SENDER o EMAIL_PASSWORD no configurados — correo omitido.")
-        return False
+        return False, "EMAIL_SENDER o EMAIL_PASSWORD no configurados en las variables de entorno."
 
     msg = MIMEMultipart("mixed")
     msg["Subject"] = subject
     msg["From"]    = EMAIL_SENDER
     msg["To"]      = ", ".join(recipients)
-
     msg.attach(MIMEText(html_body, "html", "utf-8"))
 
     for path in (attachments or []):
@@ -38,16 +49,124 @@ def _send(subject: str, html_body: str, recipients: list[str], attachments: list
             msg.attach(part)
 
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=20) as server:
+        print(f"[email_service] Conectando a {SMTP_HOST}:{SMTP_PORT} ...")
+        with smtplib.SMTP(SMTP_HOST, SMTP_PORT, timeout=30) as server:
             server.ehlo()
+            print(f"[email_service] STARTTLS ...")
             server.starttls()
+            server.ehlo()
+            print(f"[email_service] Login como {EMAIL_SENDER} ...")
             server.login(EMAIL_SENDER, EMAIL_PASSWORD)
             server.sendmail(EMAIL_SENDER, recipients, msg.as_string())
-        print(f"[email_service] Correo enviado a {recipients}")
-        return True
+        print(f"[email_service] OK Correo enviado a {recipients}")
+        return True, "OK"
+    except smtplib.SMTPAuthenticationError as exc:
+        msg_err = f"Autenticacion fallida: {exc} — verifica EMAIL_SENDER y EMAIL_PASSWORD (usa contrasena de app, no la contrasena normal)"
+        print(f"[email_service] FALLO: {msg_err}")
+        return False, msg_err
+    except smtplib.SMTPConnectError as exc:
+        msg_err = f"No se pudo conectar a {SMTP_HOST}:{SMTP_PORT} — Render puede estar bloqueando SMTP: {exc}"
+        print(f"[email_service] FALLO: {msg_err}")
+        return False, msg_err
     except Exception as exc:
-        print(f"[email_service] Error al enviar correo: {exc}")
-        return False
+        msg_err = f"{type(exc).__name__}: {exc}"
+        print(f"[email_service] FALLO SMTP: {msg_err}")
+        print(traceback.format_exc())
+        return False, msg_err
+
+
+def _send_via_sendgrid(subject: str, html_body: str, recipients: list[str]) -> tuple[bool, str]:
+    """Fallback: envía via SendGrid HTTP API si SENDGRID_API_KEY está configurado."""
+    if not SENDGRID_KEY:
+        return False, "SENDGRID_API_KEY no configurada."
+    try:
+        import httpx
+        payload = {
+            "personalizations": [{"to": [{"email": r} for r in recipients]}],
+            "from": {"email": EMAIL_SENDER or "noreply@thesisreview.ai"},
+            "subject": subject,
+            "content": [{"type": "text/html", "value": html_body}],
+        }
+        resp = httpx.post(
+            "https://api.sendgrid.com/v3/mail/send",
+            json=payload,
+            headers={"Authorization": f"Bearer {SENDGRID_KEY}"},
+            timeout=20,
+        )
+        if resp.status_code in (200, 202):
+            print(f"[email_service] OK Correo enviado via SendGrid a {recipients}")
+            return True, "OK (SendGrid)"
+        else:
+            msg_err = f"SendGrid HTTP {resp.status_code}: {resp.text[:200]}"
+            print(f"[email_service] ✗ {msg_err}")
+            return False, msg_err
+    except Exception as exc:
+        msg_err = f"SendGrid error: {exc}"
+        print(f"[email_service] ✗ {msg_err}")
+        return False, msg_err
+
+
+def _send(subject: str, html_body: str, recipients: list[str],
+          attachments: list[str] | None = None) -> bool:
+    """Envía correo: intenta SMTP primero, luego SendGrid como fallback."""
+    print(f"[email_service] Enviando '{subject[:60]}' → {recipients}")
+    ok, detail = _send_via_smtp(subject, html_body, recipients, attachments)
+    if ok:
+        return True
+    print(f"[email_service] SMTP falló ({detail}). Intentando SendGrid ...")
+    ok2, detail2 = _send_via_sendgrid(subject, html_body, recipients)
+    if not ok2:
+        print(f"[email_service] SendGrid también falló ({detail2}). Correo no enviado.")
+    return ok2
+
+
+def send_test_email() -> dict:
+    """Envía un correo de prueba simple. Retorna dict con resultado y detalles."""
+    subject = "[ThesisReview AI] Prueba de configuración de correo"
+    html    = f"""<div style="font-family:Arial,sans-serif;padding:20px">
+        <h2 style="color:#1e3a5f">✓ Prueba de correo exitosa</h2>
+        <p>Este correo confirma que la configuración SMTP de ThesisReview AI está funcionando correctamente.</p>
+        <table style="border-collapse:collapse;font-size:13px;margin-top:12px">
+          <tr><td style="padding:4px 10px;background:#f3f4f6;font-weight:bold">SMTP_HOST</td>
+              <td style="padding:4px 10px">{SMTP_HOST}</td></tr>
+          <tr><td style="padding:4px 10px;background:#f3f4f6;font-weight:bold">SMTP_PORT</td>
+              <td style="padding:4px 10px">{SMTP_PORT}</td></tr>
+          <tr><td style="padding:4px 10px;background:#f3f4f6;font-weight:bold">EMAIL_SENDER</td>
+              <td style="padding:4px 10px">{EMAIL_SENDER}</td></tr>
+          <tr><td style="padding:4px 10px;background:#f3f4f6;font-weight:bold">Enviado a</td>
+              <td style="padding:4px 10px">{EMAIL_RECIPIENT}</td></tr>
+          <tr><td style="padding:4px 10px;background:#f3f4f6;font-weight:bold">Fecha</td>
+              <td style="padding:4px 10px">{datetime.now().strftime("%d/%m/%Y %H:%M:%S")}</td></tr>
+        </table>
+    </div>"""
+
+    smtp_ok, smtp_detail = _send_via_smtp(subject, html, [EMAIL_RECIPIENT])
+    result = {
+        "smtp_host":       SMTP_HOST,
+        "smtp_port":       SMTP_PORT,
+        "email_sender":    EMAIL_SENDER or "(no configurado)",
+        "email_password":  f"{'✓ ' + str(len(EMAIL_PASSWORD)) + ' chars' if EMAIL_PASSWORD else '✗ no configurada'}",
+        "email_recipient": EMAIL_RECIPIENT,
+        "smtp_result":     "OK" if smtp_ok else f"FALLÓ: {smtp_detail}",
+        "sent_via":        None,
+    }
+    if smtp_ok:
+        result["sent_via"] = "smtp"
+        return result
+
+    sg_ok, sg_detail = _send_via_sendgrid(subject, html, [EMAIL_RECIPIENT])
+    result["sendgrid_key"] = "✓ configurada" if SENDGRID_KEY else "✗ no configurada"
+    result["sendgrid_result"] = "OK" if sg_ok else f"FALLÓ: {sg_detail}"
+    if sg_ok:
+        result["sent_via"] = "sendgrid"
+    else:
+        result["sent_via"] = None
+        result["suggestion"] = (
+            "Ambos métodos fallaron. Opciones: "
+            "1) Verifica EMAIL_SENDER y EMAIL_PASSWORD en Render → Environment. "
+            "2) Si Render bloquea SMTP, agrega SENDGRID_API_KEY (gratis en sendgrid.com, 100 correos/día)."
+        )
+    return result
 
 
 # ── Paleta de colores y helpers HTML ──────────────────────────────────────────
