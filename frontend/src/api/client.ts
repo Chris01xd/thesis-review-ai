@@ -6,7 +6,7 @@ const BASE = import.meta.env.VITE_API_URL ?? ''
 
 const client = axios.create({
   baseURL: BASE,
-  timeout: 30000,
+  timeout: 300000, // 5 min — análisis IA puede tardar en servidores lentos
 })
 
 client.interceptors.request.use((config) => {

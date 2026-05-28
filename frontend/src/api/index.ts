@@ -37,7 +37,7 @@ export const uploadAdvance = (formData: FormData) =>
   }).then((r) => r.data)
 
 export const analyzeAdvance = (id: number) =>
-  client.post<{ message: string }>(`/api/advance/${id}/analyze`).then((r) => r.data)
+  client.post<{ message: string }>(`/api/advance/${id}/analyze`, {}, { timeout: 180000 }).then((r) => r.data)
 
 // ── Findings ──────────────────────────────────────────────────────────────────
 export const getFindings = (advanceId: number) =>
