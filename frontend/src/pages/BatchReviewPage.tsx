@@ -85,8 +85,8 @@ export default function BatchReviewPage() {
       try {
         await analyzeAdvance(id)
         setJobs((prev) => prev.map((j) => j.id === id ? { ...j, status: 'done' } : j))
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : 'Error desconocido'
+      } catch (e: any) {
+        const msg = e?.response?.data?.detail ?? e?.message ?? 'Error desconocido'
         setJobs((prev) => prev.map((j) => j.id === id ? { ...j, status: 'error', error: msg } : j))
       }
       setProgress(Math.round(((i + 1) / ids.length) * 100))
@@ -231,15 +231,24 @@ export default function BatchReviewPage() {
                 {/* Job list */}
                 <div className="space-y-1.5 max-h-64 overflow-y-auto">
                   {jobs.map((job) => (
-                    <div key={job.id} className="flex items-center gap-2 text-xs">
-                      {job.status === 'pending' && <div className="w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin shrink-0" />}
-                      {job.status === 'done'    && <CheckCircle2 size={14} className="text-emerald-500 shrink-0" />}
-                      {job.status === 'error'   && <XCircle size={14} className="text-red-500 shrink-0" />}
-                      <span className={cn('flex-1 truncate', job.status === 'error' ? 'text-red-600' : 'text-slate-600')}>
-                        {job.title}
-                      </span>
+                    <div key={job.id} className="flex items-start gap-2 text-xs">
+                      <div className="mt-0.5 shrink-0">
+                        {job.status === 'pending' && <div className="w-3.5 h-3.5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin" />}
+                        {job.status === 'done'    && <CheckCircle2 size={14} className="text-emerald-500" />}
+                        {job.status === 'error'   && <XCircle size={14} className="text-red-500" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <span className={cn('block truncate', job.status === 'error' ? 'text-red-600 font-medium' : 'text-slate-600')}>
+                          {job.title}
+                        </span>
+                        {job.status === 'error' && job.error && (
+                          <span className="block text-red-400 text-[10px] leading-tight mt-0.5 break-words">
+                            {job.error}
+                          </span>
+                        )}
+                      </div>
                       {job.status === 'done' && (
-                        <Link to={`/advances/${job.id}`} className="text-blue-500 hover:text-blue-700 shrink-0">
+                        <Link to={`/advances/${job.id}`} className="text-blue-500 hover:text-blue-700 shrink-0 mt-0.5">
                           <ExternalLink size={12} />
                         </Link>
                       )}
