@@ -16,7 +16,7 @@ SMTP_PORT       = int(os.getenv("SMTP_PORT",   "587"))
 EMAIL_SENDER    = os.getenv("EMAIL_SENDER",    "")
 EMAIL_PASSWORD  = os.getenv("EMAIL_PASSWORD",  "")
 EMAIL_RECIPIENT = os.getenv("EMAIL_RECIPIENT", "christiannoriegaoliva2020@gmail.com")
-SENDGRID_KEY    = os.getenv("SENDGRID_API_KEY", "")
+RESEND_KEY      = os.getenv("RESEND_API_KEY",  "")
 
 # Log de configuración al cargar el módulo
 print("[email_service] == Configuracion cargada ==")
@@ -25,7 +25,7 @@ print(f"[email_service]   SMTP_PORT      : {SMTP_PORT}")
 print(f"[email_service]   EMAIL_SENDER   : {('OK ' + EMAIL_SENDER) if EMAIL_SENDER else 'NO CONFIGURADO'}")
 print(f"[email_service]   EMAIL_PASSWORD : {('OK (' + str(len(EMAIL_PASSWORD)) + ' chars)') if EMAIL_PASSWORD else 'NO CONFIGURADA'}")
 print(f"[email_service]   EMAIL_RECIPIENT: {EMAIL_RECIPIENT}")
-print(f"[email_service]   SENDGRID_KEY   : {'OK configurada' if SENDGRID_KEY else 'no configurada (opcional)'}")
+print(f"[email_service]   RESEND_KEY     : {'OK configurada' if RESEND_KEY else 'no configurada (opcional)'}")
 print("[email_service] ===============================")
 
 
@@ -75,48 +75,51 @@ def _send_via_smtp(subject: str, html_body: str, recipients: list[str],
         return False, msg_err
 
 
-def _send_via_sendgrid(subject: str, html_body: str, recipients: list[str]) -> tuple[bool, str]:
-    """Fallback: envía via SendGrid HTTP API si SENDGRID_API_KEY está configurado."""
-    if not SENDGRID_KEY:
-        return False, "SENDGRID_API_KEY no configurada."
+def _send_via_resend(subject: str, html_body: str, recipients: list[str]) -> tuple[bool, str]:
+    """Fallback: envía via Resend HTTP API si RESEND_API_KEY está configurado."""
+    if not RESEND_KEY:
+        return False, "RESEND_API_KEY no configurada."
     try:
         import httpx
         payload = {
-            "personalizations": [{"to": [{"email": r} for r in recipients]}],
-            "from": {"email": EMAIL_SENDER or "noreply@thesisreview.ai"},
+            "from": EMAIL_SENDER or "ThesisReview AI <noreply@resend.dev>",
+            "to": recipients,
             "subject": subject,
-            "content": [{"type": "text/html", "value": html_body}],
+            "html": html_body,
         }
         resp = httpx.post(
-            "https://api.sendgrid.com/v3/mail/send",
+            "https://api.resend.com/emails",
             json=payload,
-            headers={"Authorization": f"Bearer {SENDGRID_KEY}"},
+            headers={
+                "Authorization": f"Bearer {RESEND_KEY}",
+                "Content-Type": "application/json",
+            },
             timeout=20,
         )
-        if resp.status_code in (200, 202):
-            print(f"[email_service] OK Correo enviado via SendGrid a {recipients}")
-            return True, "OK (SendGrid)"
+        if resp.status_code in (200, 201):
+            print(f"[email_service] OK Correo enviado via Resend a {recipients}")
+            return True, "OK (Resend)"
         else:
-            msg_err = f"SendGrid HTTP {resp.status_code}: {resp.text[:200]}"
-            print(f"[email_service] ✗ {msg_err}")
+            msg_err = f"Resend HTTP {resp.status_code}: {resp.text[:300]}"
+            print(f"[email_service] FALLO Resend: {msg_err}")
             return False, msg_err
     except Exception as exc:
-        msg_err = f"SendGrid error: {exc}"
-        print(f"[email_service] ✗ {msg_err}")
+        msg_err = f"Resend error: {exc}"
+        print(f"[email_service] FALLO Resend: {msg_err}")
         return False, msg_err
 
 
 def _send(subject: str, html_body: str, recipients: list[str],
           attachments: list[str] | None = None) -> bool:
-    """Envía correo: intenta SMTP primero, luego SendGrid como fallback."""
-    print(f"[email_service] Enviando '{subject[:60]}' → {recipients}")
+    """Envía correo: intenta SMTP primero, luego Resend como fallback HTTP."""
+    print(f"[email_service] Enviando '{subject[:60]}' -> {recipients}")
     ok, detail = _send_via_smtp(subject, html_body, recipients, attachments)
     if ok:
         return True
-    print(f"[email_service] SMTP falló ({detail}). Intentando SendGrid ...")
-    ok2, detail2 = _send_via_sendgrid(subject, html_body, recipients)
+    print(f"[email_service] SMTP fallo ({detail}). Intentando Resend ...")
+    ok2, detail2 = _send_via_resend(subject, html_body, recipients)
     if not ok2:
-        print(f"[email_service] SendGrid también falló ({detail2}). Correo no enviado.")
+        print(f"[email_service] Resend tambien fallo ({detail2}). Correo no enviado.")
     return ok2
 
 
@@ -145,26 +148,27 @@ def send_test_email() -> dict:
         "smtp_host":       SMTP_HOST,
         "smtp_port":       SMTP_PORT,
         "email_sender":    EMAIL_SENDER or "(no configurado)",
-        "email_password":  f"{'✓ ' + str(len(EMAIL_PASSWORD)) + ' chars' if EMAIL_PASSWORD else '✗ no configurada'}",
+        "email_password":  f"{'OK ' + str(len(EMAIL_PASSWORD)) + ' chars' if EMAIL_PASSWORD else 'no configurada'}",
         "email_recipient": EMAIL_RECIPIENT,
-        "smtp_result":     "OK" if smtp_ok else f"FALLÓ: {smtp_detail}",
+        "smtp_result":     "OK" if smtp_ok else f"FALLO: {smtp_detail}",
         "sent_via":        None,
     }
     if smtp_ok:
         result["sent_via"] = "smtp"
         return result
 
-    sg_ok, sg_detail = _send_via_sendgrid(subject, html, [EMAIL_RECIPIENT])
-    result["sendgrid_key"] = "✓ configurada" if SENDGRID_KEY else "✗ no configurada"
-    result["sendgrid_result"] = "OK" if sg_ok else f"FALLÓ: {sg_detail}"
-    if sg_ok:
-        result["sent_via"] = "sendgrid"
+    resend_ok, resend_detail = _send_via_resend(subject, html, [EMAIL_RECIPIENT])
+    result["resend_key"]    = "OK configurada" if RESEND_KEY else "no configurada"
+    result["resend_result"] = "OK" if resend_ok else f"FALLO: {resend_detail}"
+    if resend_ok:
+        result["sent_via"] = "resend"
     else:
         result["sent_via"] = None
         result["suggestion"] = (
-            "Ambos métodos fallaron. Opciones: "
-            "1) Verifica EMAIL_SENDER y EMAIL_PASSWORD en Render → Environment. "
-            "2) Si Render bloquea SMTP, agrega SENDGRID_API_KEY (gratis en sendgrid.com, 100 correos/día)."
+            "Ambos metodos fallaron. "
+            "Render bloquea SMTP saliente (puerto 587). "
+            "Solución: crea una cuenta en resend.com, obtén tu API key "
+            "y agrega RESEND_API_KEY en Render -> Environment."
         )
     return result
 

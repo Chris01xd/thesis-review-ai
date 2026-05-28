@@ -41,7 +41,7 @@ services:
         sync: false
       - key: EMAIL_RECIPIENT
         sync: false
-      - key: SENDGRID_API_KEY
+      - key: RESEND_API_KEY
         sync: false
       - key: SMTP_HOST
         value: smtp.gmail.com
