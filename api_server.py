@@ -332,11 +332,23 @@ def analyze_advance(advance_id: int):
     if not adv_rows:
         raise HTTPException(status_code=404, detail="Avance no encontrado")
     adv = dict(adv_rows[0])
+    # Buscar plantilla: asignada → del programa → cualquier activa
     tpl_rows = query("SELECT * FROM templates WHERE id=?", (adv.get("template_id"),))
     if not tpl_rows:
-        raise HTTPException(status_code=400, detail="Sin plantilla asignada")
+        tpl_rows = query(
+            "SELECT * FROM templates WHERE program_id=? AND active=1 LIMIT 1",
+            (adv.get("program_id"),)
+        )
+    if not tpl_rows:
+        tpl_rows = query("SELECT * FROM templates WHERE active=1 LIMIT 1")
+    if not tpl_rows:
+        raise HTTPException(status_code=400, detail="No hay plantillas activas configuradas en el sistema")
     execute("UPDATE advances SET status=? WHERE id=?", ("Análisis IA en proceso", advance_id))
-    _run_analysis(advance_id, dict(tpl_rows[0]), adv["student_id"])
+    try:
+        _run_analysis(advance_id, dict(tpl_rows[0]), adv["student_id"])
+    except Exception as exc:
+        execute("UPDATE advances SET status=? WHERE id=?", ("Error en análisis", advance_id))
+        raise HTTPException(status_code=500, detail=f"Error durante el análisis: {exc}")
     return {"message": "Análisis IA completado"}
 
 
@@ -352,18 +364,31 @@ def batch_analyze(data: BatchAnalyzeRequest):
 
     results = []
     for advance_id in data.advance_ids:
-        adv_rows = query("SELECT * FROM advances WHERE id=?", (advance_id,))
-        if not adv_rows:
-            results.append({"advance_id": advance_id, "status": "not_found"})
-            continue
-        adv = dict(adv_rows[0])
-        tpl_rows = query("SELECT * FROM templates WHERE id=?", (adv.get("template_id"),))
-        if not tpl_rows:
-            results.append({"advance_id": advance_id, "status": "no_template"})
-            continue
-        execute("UPDATE advances SET status=? WHERE id=?", ("Análisis IA en proceso", advance_id))
-        _run_analysis(advance_id, dict(tpl_rows[0]), adv["student_id"])
-        results.append({"advance_id": advance_id, "status": "completed"})
+        try:
+            adv_rows = query("SELECT * FROM advances WHERE id=?", (advance_id,))
+            if not adv_rows:
+                results.append({"advance_id": advance_id, "status": "not_found"})
+                continue
+            adv = dict(adv_rows[0])
+            # Buscar plantilla: primero la asignada, luego cualquier activa del programa, luego la primera activa
+            tpl_rows = query("SELECT * FROM templates WHERE id=?", (adv.get("template_id"),))
+            if not tpl_rows:
+                tpl_rows = query(
+                    "SELECT * FROM templates WHERE program_id=? AND active=1 LIMIT 1",
+                    (adv.get("program_id"),)
+                )
+            if not tpl_rows:
+                tpl_rows = query("SELECT * FROM templates WHERE active=1 LIMIT 1")
+            if not tpl_rows:
+                results.append({"advance_id": advance_id, "status": "no_template"})
+                continue
+            execute("UPDATE advances SET status=? WHERE id=?", ("Análisis IA en proceso", advance_id))
+            _run_analysis(advance_id, dict(tpl_rows[0]), adv["student_id"])
+            results.append({"advance_id": advance_id, "status": "completed"})
+        except Exception as exc:
+            print(f"[batch_analyze] Error en avance {advance_id}: {exc}")
+            execute("UPDATE advances SET status=? WHERE id=?", ("Error en análisis", advance_id))
+            results.append({"advance_id": advance_id, "status": "error", "detail": str(exc)})
 
     # Enviar correo resumen del lote completo
     processed_ids = [r["advance_id"] for r in results if r["status"] == "completed"]
