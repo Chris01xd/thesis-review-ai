@@ -433,12 +433,8 @@ def send_review_email(advance_id: int, pdf_path: str | None = None) -> bool:
 </html>"""
 
     recipients = [EMAIL_RECIPIENT]
-    # Enviar también al asesor si tiene correo y es distinto al destinatario por defecto
-    advisor_email = adv.get("advisor_email")
-    if advisor_email and advisor_email not in recipients:
-        recipients.append(advisor_email)
 
-    subject = f"[ThesisReview AI] Revisión — {adv['student']} · {adv['advance_type']} · {now_str}"
+    subject = f"[ThesisReview AI] Revision — {adv['student']} · {adv['advance_type']} · {now_str}"
     attachments = [pdf_path] if pdf_path and os.path.exists(pdf_path) else []
 
     return _send(subject, html, recipients, attachments)
@@ -569,5 +565,5 @@ def send_batch_review_email(advance_ids: list[int]) -> bool:
 </body>
 </html>"""
 
-    subject = f"[ThesisReview AI] Reporte lote — {len(rows_data)} avances procesados · {now_str}"
+    subject = f"[ThesisReview AI] Reporte lote - {len(rows_data)} avances procesados - {now_str}"
     return _send(subject, html, [EMAIL_RECIPIENT])
