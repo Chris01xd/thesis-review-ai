@@ -23,6 +23,8 @@ services:
         value: "true"
       - key: ORCID_ENABLED
         value: "true"
+      - key: CORE_API_KEY
+        sync: false
       - key: COPYLEAKS_API_KEY
         sync: false
       - key: COPYLEAKS_EMAIL
