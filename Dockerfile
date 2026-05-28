@@ -16,4 +16,4 @@ COPY . .
 # Crear directorios de datos en tiempo de build (el volumen los sobreescribe en runtime)
 RUN mkdir -p data/uploads data/reports
 
-EXPOSE 8501 8000
+EXPOSE 8000

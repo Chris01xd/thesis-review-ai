@@ -20,6 +20,7 @@ build/
 data/thesis_review.db
 data/uploads/
 data/reports/
+data/thesis/
 *.db
 *.sqlite
 *.sqlite3

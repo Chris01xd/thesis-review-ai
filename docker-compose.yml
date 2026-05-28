@@ -31,6 +31,11 @@ services:
       - APP_SECRET=${APP_SECRET}
       - MAX_FILE_MB=${MAX_FILE_MB:-20}
       - DB_PATH=${DB_PATH:-data/thesis_review.db}
+      - EMAIL_SENDER=${EMAIL_SENDER}
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+      - EMAIL_RECIPIENT=${EMAIL_RECIPIENT:-christiannoriegaoliva2020@gmail.com}
+      - SMTP_HOST=${SMTP_HOST:-smtp.gmail.com}
+      - SMTP_PORT=${SMTP_PORT:-587}
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]

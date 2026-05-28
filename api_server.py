@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, UploadFile, File, Form
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 from typing import Optional
 import os, json, time
@@ -11,7 +11,11 @@ from modules.document_processing import extract_text_from_upload
 from modules.ai_engine import local_agentic_analysis, agent_plan_for_document
 from modules.plagiarism import run_similarity_check
 from modules.citations import validate_citations
-from modules.reports import generate_review_pdf
+from modules.reports import generate_review_pdf, generate_similarity_pdf, generate_ai_detection_pdf
+from modules.email_service import send_review_email, send_batch_review_email
+from modules.thesis_generator import generate_thesis
+from modules.open_similarity import run_open_similarity
+from modules.ai_detector import run_ai_detection
 
 init_db()
 os.makedirs("data/uploads", exist_ok=True)
@@ -314,6 +318,12 @@ def _run_analysis(advance_id: int, tpl: dict, actor_id: int):
     validate_citations(advance_id, adv["text_content"] or "", online=False)
     execute("UPDATE advances SET status=? WHERE id=?", ("En revisión humana", advance_id))
     log(actor_id, "AI_ANALYSIS", "advances", advance_id, {"grade": result["grade"]})
+    # Enviar reporte por correo (no bloquea si falla)
+    try:
+        pdf_path = generate_review_pdf(advance_id)
+        send_review_email(advance_id, pdf_path)
+    except Exception as _exc:
+        print(f"[email] Error al enviar reporte del avance {advance_id}: {_exc}")
 
 
 @app.post("/api/advance/{advance_id}/analyze", summary="Ejecutar análisis IA", tags=["Avances"])
@@ -328,6 +338,41 @@ def analyze_advance(advance_id: int):
     execute("UPDATE advances SET status=? WHERE id=?", ("Análisis IA en proceso", advance_id))
     _run_analysis(advance_id, dict(tpl_rows[0]), adv["student_id"])
     return {"message": "Análisis IA completado"}
+
+
+class BatchAnalyzeRequest(BaseModel):
+    advance_ids: list[int]
+
+
+@app.post("/api/advances/batch-analyze", summary="Análisis IA por lotes", tags=["Avances"])
+def batch_analyze(data: BatchAnalyzeRequest):
+    """Ejecuta el pipeline de IA en múltiples avances y envía un correo resumen al finalizar."""
+    if not data.advance_ids:
+        raise HTTPException(status_code=400, detail="Lista de avances vacía")
+
+    results = []
+    for advance_id in data.advance_ids:
+        adv_rows = query("SELECT * FROM advances WHERE id=?", (advance_id,))
+        if not adv_rows:
+            results.append({"advance_id": advance_id, "status": "not_found"})
+            continue
+        adv = dict(adv_rows[0])
+        tpl_rows = query("SELECT * FROM templates WHERE id=?", (adv.get("template_id"),))
+        if not tpl_rows:
+            results.append({"advance_id": advance_id, "status": "no_template"})
+            continue
+        execute("UPDATE advances SET status=? WHERE id=?", ("Análisis IA en proceso", advance_id))
+        _run_analysis(advance_id, dict(tpl_rows[0]), adv["student_id"])
+        results.append({"advance_id": advance_id, "status": "completed"})
+
+    # Enviar correo resumen del lote completo
+    processed_ids = [r["advance_id"] for r in results if r["status"] == "completed"]
+    try:
+        send_batch_review_email(processed_ids)
+    except Exception as _exc:
+        print(f"[email] Error al enviar resumen del lote: {_exc}")
+
+    return {"processed": len(processed_ids), "results": results}
 
 
 # ── Hallazgos ─────────────────────────────────────────────────────────────────
@@ -788,3 +833,165 @@ def get_audit(limit: int = 200):
         (limit,),
     )
     return [dict(r) for r in rows]
+
+
+# ── Generador de tesis ────────────────────────────────────────────────────────
+
+class ThesisRequest(BaseModel):
+    title:         str
+    authors:       str          # comma-separated names
+    advisor:       str
+    research_line: str
+    city:          str  = "Trujillo"
+    year:          int  = 2026
+    jurado:        list[str] = []
+
+
+@app.post("/api/generar_tesis", summary="Generar tesis completa (PDF + DOCX)", tags=["Tesis"])
+def generar_tesis(req: ThesisRequest):
+    """
+    Recibe los datos de la tesis y genera automáticamente:
+    - Capítulo I completo (Introducción en prosa)
+    - Referencias APA V7 (mínimo 30, 80% inglés, 80% últimos 5 años, 80% indexados)
+    - Árbol de problemas y árbol de objetivos
+    - Declaración jurada
+    - Formato exacto: Arial Narrow 12pt, márgenes 3/2.5/2.5/2.5 cm, interlineado 1.5, justificado
+    """
+    try:
+        result = generate_thesis({
+            'title':         req.title,
+            'authors':       req.authors,
+            'advisor':       req.advisor,
+            'research_line': req.research_line,
+            'city':          req.city,
+            'year':          req.year,
+            'jurado':        req.jurado or [],
+        })
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generando tesis: {e}")
+
+
+@app.get("/api/generar_tesis/download/{filename}", summary="Descargar archivo de tesis", tags=["Tesis"])
+def download_thesis_file(filename: str):
+    """Descarga el PDF o DOCX generado."""
+    path = os.path.join("data/thesis", filename)
+    if not os.path.exists(path) or ".." in filename:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    media_type = "application/pdf" if filename.endswith(".pdf") else \
+                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    return FileResponse(path, media_type=media_type, filename=filename)
+
+
+# ── Similitud académica abierta ────────────────────────────────────────────────
+
+@app.post("/api/similitud/check",
+          summary="Verificar similitud académica contra repositorios abiertos",
+          tags=["Similitud abierta"])
+async def check_open_similarity(file: UploadFile = File(...)):
+    """
+    Recibe un PDF, DOCX o TXT y lo compara contra:
+    - OpenAlex, Crossref, arXiv, CORE (si hay clave) — repositorios abiertos
+    - Documentos internos del sistema (full-text TF-IDF)
+
+    NOTA: No es equivalente a Turnitin. Solo compara contra fuentes de acceso abierto.
+    """
+    # Guardar archivo temporal
+    suffix = os.path.splitext(file.filename or "doc.pdf")[1].lower().lstrip('.')
+    if suffix not in ("pdf", "docx", "txt"):
+        raise HTTPException(status_code=400, detail="Formato no permitido. Usa PDF, DOCX o TXT.")
+
+    os.makedirs("data/uploads", exist_ok=True)
+    tmp_path = f"data/uploads/sim_tmp_{int(time.time())}_{file.filename}"
+    try:
+        content = await file.read()
+        with open(tmp_path, "wb") as f_out:
+            f_out.write(content)
+
+        text, _ = extract_text_from_upload(tmp_path, suffix)
+        if not text or len(text.strip()) < 50:
+            raise HTTPException(status_code=422, detail="No se pudo extraer texto suficiente del archivo.")
+
+        result = run_open_similarity(text, file.filename or "")
+        return result
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)
+
+
+@app.post("/api/similitud/report",
+          summary="Generar PDF del reporte de similitud académica",
+          tags=["Similitud abierta"])
+async def download_similarity_report(report_data: dict):
+    """
+    Recibe el JSON del reporte de similitud (devuelto por /api/similitud/check)
+    y genera un PDF descargable.
+    """
+    try:
+        pdf_bytes = generate_similarity_pdf(report_data)
+        filename  = f"reporte_similitud_{int(time.time())}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error generando reporte PDF: {exc}")
+
+
+@app.post("/api/ai-detector/report",
+          summary="Generar PDF del reporte del detector IA",
+          tags=["Detector IA"])
+async def download_ai_detection_report(report_data: dict):
+    """
+    Recibe el JSON del análisis de detección IA y genera un PDF con
+    los párrafos sospechosos resaltados en azul.
+    """
+    try:
+        pdf_bytes = generate_ai_detection_pdf(report_data)
+        filename  = f"reporte_detector_ia_{int(time.time())}.pdf"
+        return Response(
+            content=pdf_bytes,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+        )
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Error generando reporte: {exc}")
+
+
+# ── Detector de contenido generado por IA ─────────────────────────────────────
+
+@app.post("/api/ai-detector/check",
+          summary="Detectar posible contenido generado por IA",
+          tags=["Detector IA"])
+async def check_ai_content(file: UploadFile = File(...)):
+    """
+    Recibe un PDF, DOCX o TXT y estima la probabilidad de que el texto
+    haya sido generado por inteligencia artificial.
+
+    Usa análisis lingüístico estadístico (uniformidad oracional, entropía,
+    diversidad léxica, repetición de frases, palabras de transición formal)
+    y opcionalmente el modelo Hello-SimpleAI/chatgpt-detector-roberta.
+
+    NOTA: Es una estimación técnica, no una prueba definitiva.
+    """
+    suffix = os.path.splitext(file.filename or "doc.pdf")[1].lower().lstrip('.')
+    if suffix not in ("pdf", "docx", "txt"):
+        raise HTTPException(status_code=400, detail="Formato no permitido. Usa PDF, DOCX o TXT.")
+
+    os.makedirs("data/uploads", exist_ok=True)
+    tmp_path = f"data/uploads/ai_tmp_{int(time.time())}_{file.filename}"
+    try:
+        content = await file.read()
+        with open(tmp_path, "wb") as f_out:
+            f_out.write(content)
+
+        text, _ = extract_text_from_upload(tmp_path, suffix)
+        if not text or len(text.strip().split()) < 50:
+            raise HTTPException(status_code=422, detail="No se pudo extraer texto suficiente del archivo (mínimo 50 palabras).")
+
+        result = run_ai_detection(text, file.filename or "")
+        return result
+    finally:
+        if os.path.exists(tmp_path):
+            os.remove(tmp_path)

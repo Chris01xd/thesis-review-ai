@@ -18,6 +18,9 @@ import TemplatesPage from './pages/TemplatesPage'
 import UsersPage from './pages/UsersPage'
 import AuditPage from './pages/AuditPage'
 import ConfigPage from './pages/ConfigPage'
+import GenerarTesisPage from './pages/GenerarTesisPage'
+import SimilitudAbiertaPage from './pages/SimilitudAbiertaPage'
+import DetectorIAPage from './pages/DetectorIAPage'
 
 const qc = new QueryClient({
   defaultOptions: { queries: { retry: 1, staleTime: 30_000 } },
@@ -91,6 +94,9 @@ export default function App() {
                   <ConfigPage />
                 </ProtectedRoute>
               } />
+              <Route path="generar-tesis" element={<GenerarTesisPage />} />
+              <Route path="similitud" element={<SimilitudAbiertaPage />} />
+              <Route path="detector-ia" element={<DetectorIAPage />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Route>
           </Routes>

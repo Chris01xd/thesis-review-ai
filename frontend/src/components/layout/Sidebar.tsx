@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils'
 import {
   LayoutDashboard, Users, FileText, Upload, ClipboardCheck, Layers,
   BarChart2, FileDown, Settings, BookOpen, UserCog, ScrollText, LogOut, X,
+  PenLine, ShieldCheck, Bot,
 } from 'lucide-react'
 import type { Role } from '@/types'
 
@@ -27,6 +28,9 @@ const NAV: NavItem[] = [
   { to: '/users',         label: 'Usuarios',        icon: <UserCog size={18} />,         roles: ['ADMIN','COORDINATOR'] },
   { to: '/audit',         label: 'Auditoría',       icon: <ScrollText size={18} />,      roles: ['ADMIN','COORDINATOR'] },
   { to: '/config',        label: 'Configuración',   icon: <Settings size={18} />,        roles: ['ADMIN'] },
+  { to: '/generar-tesis', label: 'Generar Tesis',   icon: <PenLine size={18} />,         roles: ['ADMIN','COORDINATOR','ADVISOR','STUDENT'] },
+  { to: '/similitud',     label: 'Similitud Acad.', icon: <ShieldCheck size={18} />,     roles: ['ADMIN','COORDINATOR','ADVISOR','STUDENT'] },
+  { to: '/detector-ia',  label: 'Detector IA',     icon: <Bot size={18} />,             roles: ['ADMIN','COORDINATOR','ADVISOR','STUDENT'] },
 ]
 
 interface SidebarProps {
