@@ -1034,3 +1034,130 @@ async def check_ai_content(file: UploadFile = File(...)):
     finally:
         if os.path.exists(tmp_path):
             os.remove(tmp_path)
+
+
+# ── Chatbot inteligente ───────────────────────────────────────────────────────
+
+class ChatRequest(BaseModel):
+    message: str
+    history: list[dict] = []   # [{"role": "user"|"assistant", "content": "..."}]
+
+
+def _get_system_stats() -> dict:
+    def q(sql):
+        rows = query(sql)
+        return rows[0][list(rows[0].keys())[0]] if rows else 0
+
+    avg_row = query("SELECT ROUND(AVG(overall_score),1) AS n FROM ai_analyses")
+    avg = avg_row[0]["n"] if avg_row and avg_row[0]["n"] is not None else "N/A"
+    return {
+        "total_advances":  q("SELECT COUNT(*) AS n FROM advances"),
+        "total_analyses":  q("SELECT COUNT(*) AS n FROM ai_analyses"),
+        "total_reviews":   q("SELECT COUNT(*) AS n FROM reviews"),
+        "total_users":     q("SELECT COUNT(*) AS n FROM users"),
+        "total_students":  q("SELECT COUNT(*) AS n FROM users WHERE role='STUDENT'"),
+        "total_advisors":  q("SELECT COUNT(*) AS n FROM users WHERE role='ADVISOR'"),
+        "total_programs":  q("SELECT COUNT(*) AS n FROM programs"),
+        "total_jobs":      q("SELECT COUNT(*) AS n FROM agent_jobs"),
+        "completed_jobs":  q("SELECT COUNT(*) AS n FROM agent_jobs WHERE status='completed'"),
+        "failed_jobs":     q("SELECT COUNT(*) AS n FROM agent_jobs WHERE status='failed'"),
+        "pending_reviews": q("SELECT COUNT(*) AS n FROM reviews WHERE status='pending'"),
+        "avg_score":       avg,
+    }
+
+
+def _fallback_chat(message: str, stats: dict) -> str:
+    m = message.lower()
+    if any(w in m for w in ['cuántas','cuantas','cuántos','cuantos','total','cantidad','número','numero']):
+        if any(w in m for w in ['tesis','avance','trabajo']):
+            return f"Actualmente hay **{stats['total_advances']}** tesis/avances registrados en el sistema."
+        if any(w in m for w in ['análisis','analisis']):
+            return f"Se han realizado **{stats['total_analyses']}** análisis de IA hasta la fecha."
+        if any(w in m for w in ['revisión','revision','revisiones']):
+            return f"Se han completado **{stats['total_reviews']}** revisiones. Hay **{stats['pending_reviews']}** pendientes."
+        if any(w in m for w in ['estudiante','alumno']):
+            return f"Hay **{stats['total_students']}** estudiantes registrados."
+        if any(w in m for w in ['asesor','docente','profesor']):
+            return f"Hay **{stats['total_advisors']}** asesores registrados."
+        if any(w in m for w in ['usuario']):
+            return f"El sistema tiene **{stats['total_users']}** usuarios: {stats['total_students']} estudiantes y {stats['total_advisors']} asesores."
+        if any(w in m for w in ['program','carrera','escuela']):
+            return f"Existen **{stats['total_programs']}** programas académicos registrados."
+        if any(w in m for w in ['trabajo','job','lote','batch']):
+            return f"Se han procesado **{stats['total_jobs']}** trabajos en lote: {stats['completed_jobs']} completados y {stats['failed_jobs']} con error."
+    if any(w in m for w in ['promedio','puntaje','nota','calificación','score']):
+        return f"El puntaje promedio de los análisis IA es **{stats['avg_score']}** sobre 100."
+    if any(w in m for w in ['qué es','que es','para qué','para que','sirve','hace','función','funcion']):
+        return ("**ThesisReview AI** es una plataforma universitaria para revisión inteligente de tesis. Funciones:\n\n"
+                "• **Revisión IA**: estructura, contenido, forma y originalidad\n"
+                "• **Detector IA**: detecta texto generado por IA\n"
+                "• **Similitud académica**: OpenAlex, Crossref, arXiv, CORE\n"
+                "• **Generador de tesis**: PDF y Word con ≥50 páginas\n"
+                "• **Notificaciones**: feedback por email\n"
+                "• **App móvil** para estudiantes")
+    if any(w in m for w in ['rol','role','acceso','permiso','administrador','coordinador']):
+        return ("Roles del sistema:\n\n"
+                "• **Admin**: gestión completa\n"
+                "• **Coordinador**: supervisión de programas\n"
+                "• **Asesor**: revisión y feedback\n"
+                "• **Estudiante**: carga y seguimiento de avances")
+    if any(w in m for w in ['hola','buenas','buenos','hi','hello','saludos']):
+        return ("¡Hola! Soy el asistente de **ThesisReview AI**. 👋\n\n"
+                "Puedo contarte estadísticas del sistema, explicar sus funciones o responder dudas sobre la plataforma. ¿En qué te ayudo?")
+    if any(w in m for w in ['ayuda','help','puedo preguntar','ejemplo']):
+        return ("Puedo responder preguntas como:\n\n"
+                "• ¿Cuántas tesis hay registradas?\n"
+                "• ¿Cuántos análisis IA se han realizado?\n"
+                "• ¿Cuál es el puntaje promedio?\n"
+                "• ¿Qué funciones tiene el sistema?\n"
+                "• ¿Cuántos estudiantes hay?\n"
+                "• ¿Cuántas revisiones están pendientes?")
+    return (f"El sistema gestiona **{stats['total_advances']}** tesis, "
+            f"ha realizado **{stats['total_analyses']}** análisis de IA y tiene "
+            f"**{stats['total_users']}** usuarios. ¿Quieres saber algo más específico?")
+
+
+@app.post("/api/chat", summary="Chatbot inteligente del sistema", tags=["Chatbot"])
+def chat_endpoint(req: ChatRequest):
+    """Responde preguntas sobre el sistema usando estadísticas en tiempo real y GPT (fallback keywords)."""
+    stats = _get_system_stats()
+    api_key = os.getenv('OPENAI_API_KEY', '')
+
+    if api_key:
+        try:
+            import openai
+            client = openai.OpenAI(api_key=api_key)
+            system_prompt = (
+                "Eres el asistente virtual de ThesisReview AI, plataforma de revisión de avances de tesis "
+                "de la Universidad Nacional de Trujillo. Responde en español, de forma amigable y concisa "
+                "(máximo 120 palabras). Usa **negrita** para datos importantes.\n\n"
+                f"ESTADÍSTICAS ACTUALES:\n"
+                f"- Tesis registradas: {stats['total_advances']}\n"
+                f"- Análisis IA: {stats['total_analyses']}\n"
+                f"- Revisiones: {stats['total_reviews']} ({stats['pending_reviews']} pendientes)\n"
+                f"- Usuarios: {stats['total_users']} ({stats['total_students']} estudiantes, {stats['total_advisors']} asesores)\n"
+                f"- Programas: {stats['total_programs']}\n"
+                f"- Trabajos en lote: {stats['completed_jobs']}/{stats['total_jobs']} completados\n"
+                f"- Puntaje IA promedio: {stats['avg_score']}/100\n\n"
+                "FUNCIONES: revisión IA, detector IA, similitud académica, generador de tesis PDF+Word, email, app móvil.\n"
+                "Solo responde sobre ThesisReview AI."
+            )
+            messages = [{"role": "system", "content": system_prompt}]
+            for h in req.history[-6:]:
+                if h.get("role") in ("user","assistant") and h.get("content"):
+                    messages.append({"role": h["role"], "content": h["content"]})
+            messages.append({"role": "user", "content": req.message})
+            resp = client.chat.completions.create(
+                model=os.getenv('OPENAI_MODEL','gpt-4o-mini'),
+                messages=messages,
+                temperature=0.5,
+                max_tokens=300,
+            )
+            answer = resp.choices[0].message.content.strip()
+        except Exception as e:
+            print(f"[chat] OpenAI error: {e}")
+            answer = _fallback_chat(req.message, stats)
+    else:
+        answer = _fallback_chat(req.message, stats)
+
+    return {"answer": answer, "stats": stats}

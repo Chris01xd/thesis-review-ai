@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import { Sidebar } from './Sidebar'
+import { ChatBot } from '../shared/ChatBot'
 import { Menu } from 'lucide-react'
 
 export function AppLayout() {
@@ -37,6 +38,9 @@ export function AppLayout() {
           </div>
         </main>
       </div>
+
+      {/* Chatbot flotante — visible en todas las páginas */}
+      <ChatBot />
     </div>
   )
 }

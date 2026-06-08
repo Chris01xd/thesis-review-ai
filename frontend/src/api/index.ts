@@ -268,3 +268,15 @@ export const downloadReport = async (advanceId: number) => {
   a.click()
   URL.revokeObjectURL(url)
 }
+
+// ── Chatbot ───────────────────────────────────────────────────────────────────
+export interface ChatMessage {
+  role: 'user' | 'assistant'
+  content: string
+}
+export interface ChatResponse {
+  answer: string
+  stats: Record<string, number | string>
+}
+export const sendChatMessage = (message: string, history: ChatMessage[]) =>
+  client.post<ChatResponse>('/api/chat', { message, history }).then((r) => r.data)
