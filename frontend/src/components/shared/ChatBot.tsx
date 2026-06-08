@@ -26,7 +26,17 @@ function BotMessage({ text }: { text: string }) {
 }
 
 // ── SpeechRecognition setup ──────────────────────────────────────────────────
-const SR: typeof SpeechRecognition | undefined =
+type SRConstructor = new () => {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  onresult: ((e: any) => void) | null
+  onerror:  (() => void) | null
+  onend:    (() => void) | null
+  start():  void
+  stop():   void
+}
+const SR: SRConstructor | undefined =
   (window as any).SpeechRecognition ?? (window as any).webkitSpeechRecognition
 
 const SUGGESTIONS = [
@@ -47,7 +57,7 @@ export function ChatBot() {
   const [unread, setUnread]     = useState(0)
   const bottomRef  = useRef<HTMLDivElement>(null)
   const inputRef   = useRef<HTMLInputElement>(null)
-  const srRef      = useRef<SpeechRecognition | null>(null)
+  const srRef      = useRef<any>(null)
 
   // Scroll al último mensaje
   useEffect(() => {
