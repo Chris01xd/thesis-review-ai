@@ -30,7 +30,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=True,
+    allow_credentials=False,   # no se usan cookies — el token va en Authorization header
     allow_methods=["*"],
     allow_headers=["*"],
 )
