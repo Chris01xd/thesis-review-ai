@@ -98,8 +98,16 @@ export function ChatBot() {
       const botMsg: ChatMessage = { role: 'assistant', content: res.answer }
       setMessages([...history, botMsg])
       if (ttsEnabled) speakText(res.answer)
-    } catch {
-      setMessages([...history, { role: 'assistant', content: 'Lo siento, no pude procesar tu pregunta ahora mismo. Intenta de nuevo.' }])
+    } catch (err: any) {
+      const status  = err?.response?.status
+      const detail  = err?.response?.data?.detail || err?.message || 'sin detalle'
+      console.error('[ChatBot] error /api/chat →', status, detail, err)
+      const msg = status === 404
+        ? 'Endpoint no encontrado (404). El backend puede estar actualizándose, intenta en un momento.'
+        : status >= 500
+          ? `Error del servidor (${status}): ${detail}`
+          : `No se pudo conectar con el servidor. Verifica tu conexión.`
+      setMessages([...history, { role: 'assistant', content: msg }])
     } finally {
       setLoading(false)
     }
