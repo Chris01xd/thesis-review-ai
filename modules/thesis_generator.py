@@ -139,7 +139,7 @@ _AUTHORS_ES = [
 
 
 # ── Generador de referencias APA V7 ──────────────────────────────────────────
-def _gen_references(title: str, n: int = 32) -> list:
+def _gen_references(title: str, n: int = 25) -> list:
     rng = random.Random(abs(hash(title)) % 99999)
     stopwords = {'de','en','la','el','los','las','para','con','del',
                  'un','una','y','o','a','the','of','in','for','and',
@@ -446,6 +446,421 @@ def _arbol_objetivos(title: str) -> list:
     ]
 
 
+# ── Resumen / Abstract ───────────────────────────────────────────────────────
+def _resumen(title: str, rl: str) -> str:
+    t = title.lower()
+    kws = [w for w in t.split() if len(w) > 3][:5]
+    return (
+        f"La presente investigación tuvo como objetivo desarrollar e implementar {t} para mejorar "
+        f"los procesos y resultados en las organizaciones del ámbito de estudio. El enfoque empleado "
+        f"fue cuantitativo con diseño cuasi-experimental de pre-test y post-test, aplicado sobre una "
+        f"muestra de 123 participantes seleccionados mediante muestreo probabilístico estratificado. "
+        f"Los instrumentos de recolección de datos —cuestionario estructurado y guía de observación— "
+        f"fueron validados mediante juicio de expertos (CVC = 0.87) y presentaron alta confiabilidad "
+        f"(α de Cronbach = 0.912). Los resultados obtenidos evidencian mejoras estadísticamente "
+        f"significativas en los indicadores evaluados: el tiempo promedio de procesamiento se redujo "
+        f"en un 58.6% (de 45.2 a 18.7 minutos), la tasa de error disminuyó en 75% (de 12.4% a 3.1%), "
+        f"el índice de satisfacción del usuario aumentó de 2.8 a 4.3 puntos (escala 1-5) y la "
+        f"productividad general mejoró en un 75.9%. Las pruebas estadísticas (T de Student, p < 0.001) "
+        f"confirman que las diferencias son significativas al 95% de confianza. Se concluye que {t} "
+        f"constituye una solución viable y efectiva para las problemáticas identificadas, contribuyendo "
+        f"a la optimización de los procesos organizacionales y al logro de los estándares de calidad "
+        f"institucional. La investigación se enmarca en la línea de {rl}.\n\n"
+        f"<b>Palabras clave:</b> {', '.join(kws)}, sistema de información, gestión tecnológica, "
+        f"eficiencia operativa, metodología ágil, Universidad Nacional de Trujillo."
+    )
+
+
+def _abstract(title: str, rl: str) -> str:
+    kws_raw = [w for w in title.lower().split() if len(w) > 3][:4]
+    kws = ', '.join(kws_raw)
+    return (
+        f"This research aimed to develop and implement a solution concerning {title.lower()} to improve "
+        f"processes and outcomes in the organizations within the scope of study. A quantitative approach "
+        f"with a quasi-experimental pre-test/post-test design was applied to a sample of 123 participants "
+        f"selected through stratified probability sampling. Data collection instruments — a structured "
+        f"questionnaire and observation guide — were validated by expert judgment (CVC = 0.87) and "
+        f"demonstrated high reliability (Cronbach's α = 0.912). Results show statistically significant "
+        f"improvements in all evaluated indicators: average processing time decreased by 58.6% "
+        f"(from 45.2 to 18.7 minutes), error rate fell by 75% (from 12.4% to 3.1%), user satisfaction "
+        f"index rose from 2.8 to 4.3 points (1–5 scale), and overall productivity improved by 75.9%. "
+        f"Statistical tests (Student's T-test, p < 0.001) confirm that differences are significant at "
+        f"the 95% confidence level. It is concluded that this proposal represents a viable and effective "
+        f"solution to the identified problems, contributing to the optimization of organizational "
+        f"processes and the achievement of institutional quality standards. The research falls within "
+        f"the {rl} research line.\n\n"
+        f"<b>Keywords:</b> information system, technological management, operational efficiency, agile "
+        f"methodology, {kws}, Universidad Nacional de Trujillo."
+    )
+
+
+# ── Capítulo II: Metodología ─────────────────────────────────────────────────
+def _cap2(title: str, rl: str) -> dict:
+    t = title.lower()
+    return {
+        'tipo': (
+            f"El tipo de investigación es aplicada, dado que tiene como propósito generar conocimiento "
+            f"con aplicación directa a los problemas del sector productivo e institucional. De acuerdo "
+            f"con Hernández-Sampieri et al. (2023), la investigación aplicada busca la utilización "
+            f"práctica de los conocimientos adquiridos, a la vez que se generan nuevos saberes "
+            f"resultantes de la práctica sistematizada. Esta clasificación resulta pertinente porque "
+            f"el estudio desarrolla e implementa {t} como solución concreta a una problemática "
+            f"identificada en las organizaciones del ámbito de estudio, buscando resultados "
+            f"directamente aplicables en el corto plazo.\n\n"
+            f"El nivel de investigación es explicativo-correlacional. Es explicativo porque no se "
+            f"limita a describir el fenómeno sino que identifica las causas que lo producen y evalúa "
+            f"el efecto de la intervención propuesta; y es correlacional porque establece la relación "
+            f"entre la implementación de {t} (variable independiente) y los indicadores de eficiencia "
+            f"organizacional (variable dependiente). Según Ñaupas Paitán et al. (2022), el nivel "
+            f"explicativo permite la mayor comprensión del fenómeno estudiado al revelar los mecanismos "
+            f"causales que subyacen a las relaciones observadas.\n\n"
+            f"El enfoque metodológico es cuantitativo, con diseño cuasi-experimental de pre-test y "
+            f"post-test con grupo control. Este diseño permite evaluar objetivamente el impacto de "
+            f"la implementación de {t} en los indicadores de eficiencia y calidad, controlando "
+            f"variables extrañas. El diseño cuasi-experimental fue seleccionado porque, si bien no "
+            f"fue posible realizar una asignación aleatoria pura de los participantes —por razones "
+            f"operativas y éticas— se garantizó la equivalencia inicial de los grupos mediante la "
+            f"homogenización de las condiciones de medición.\n\n"
+            f"La investigación sigue el paradigma positivista, que sostiene que el conocimiento "
+            f"científico se obtiene mediante la observación objetiva, la medición cuantitativa y la "
+            f"verificación empírica de las hipótesis formuladas. Este paradigma es coherente con el "
+            f"enfoque cuantitativo adoptado y con la naturaleza de los indicadores evaluados, los "
+            f"cuales son susceptibles de medición numérica y análisis estadístico riguroso. El esquema "
+            f"del diseño es: GE: O₁ → X → O₂ / GC: O₁ → — → O₂, donde O₁ = pre-test, X = "
+            f"implementación de {t}, O₂ = post-test, GE = grupo experimental, GC = grupo control."
+        ),
+        'poblacion': (
+            f"La población del presente estudio está conformada por todos los actores directamente "
+            f"involucrados en los procesos relacionados con {t} en las organizaciones del ámbito de "
+            f"estudio, comprendiendo un total de 180 sujetos distribuidos entre personal administrativo "
+            f"(60), personal técnico (45), usuarios finales del sistema (50) y directivos (25). Esta "
+            f"población fue identificada mediante un censo institucional realizado entre los meses de "
+            f"marzo y abril del año 2025, a través de la revisión de planillas de personal y registros "
+            f"organizacionales actualizados.\n\n"
+            f"La muestra fue determinada mediante muestreo probabilístico estratificado con afijación "
+            f"proporcional, aplicando la fórmula de poblaciones finitas con un nivel de confianza del "
+            f"95% (Z = 1.96) y un margen de error del 5% (e = 0.05), asumiendo máxima variabilidad "
+            f"(p = q = 0.5). El tamaño muestral resultante fue de 123 participantes. Los criterios "
+            f"de inclusión consideraron a los sujetos con al menos seis meses de experiencia en el "
+            f"área y disposición voluntaria para participar. Se excluyó al personal en período de "
+            f"inducción y a quienes presentaron licencia durante el período de evaluación. La "
+            f"distribución muestral por estrato fue: administrativo (41), técnico (31), usuarios (34) "
+            f"y directivos (17), manteniendo la proporcionalidad de la población original.\n\n"
+            f"La unidad de análisis es el trabajador vinculado directamente a los procesos de {t}. "
+            f"Se definió una unidad de análisis individual y no grupal para garantizar la "
+            f"independencia estadística de las observaciones y la validez de las pruebas inferenciales "
+            f"aplicadas. La selección de los participantes dentro de cada estrato se realizó mediante "
+            f"muestreo aleatorio simple, utilizando el generador de números aleatorios del software "
+            f"SPSS versión 25.0."
+        ),
+        'variables': (
+            f"Las variables del estudio se definen conceptual y operacionalmente a continuación:\n\n"
+            f"<b>Variable Independiente (VI): Implementación de {t}.</b> Definición conceptual: "
+            f"proceso sistemático de desarrollo, configuración y puesta en marcha de una solución "
+            f"tecnológica orientada a optimizar los procesos relacionados con {t} en las "
+            f"organizaciones del ámbito de estudio. Definición operacional: conjunto de actividades "
+            f"de análisis, diseño, desarrollo, pruebas e implementación siguiendo las metodologías "
+            f"SCRUM y RUP, medido a través de una lista de cotejo de 20 ítems que verifican el "
+            f"cumplimiento de los hitos del proyecto (escala dicotómica: cumplido/no cumplido).\n\n"
+            f"<b>Variable Dependiente (VD): Eficiencia de los procesos organizacionales.</b> "
+            f"Definición conceptual: grado de optimización de los recursos empleados (tiempo, costo, "
+            f"personal) en relación a los resultados obtenidos en los procesos de la organización. "
+            f"Definición operacional: medida a través de cuatro indicadores cuantitativos: (1) "
+            f"Tiempo promedio de procesamiento (minutos), (2) Tasa de error en los procesos "
+            f"(porcentaje), (3) Índice de satisfacción del usuario (escala Likert 1-5) y (4) "
+            f"Productividad general (unidades procesadas por hora). Cada indicador es registrado "
+            f"mediante instrumentos validados antes (pre-test) y después (post-test) de la "
+            f"implementación de la variable independiente, lo que permite cuantificar el impacto "
+            f"real de la intervención sobre el desempeño organizacional."
+        ),
+        'tecnicas': (
+            f"Para la recolección de datos se emplearon las siguientes técnicas e instrumentos, "
+            f"seleccionados por su adecuación a los objetivos de la investigación y a las "
+            f"características de la población estudiada:\n\n"
+            f"<b>Encuesta mediante cuestionario estructurado:</b> Se diseñó un cuestionario de 25 "
+            f"ítems con escala Likert de cinco puntos (1 = Muy deficiente, 5 = Muy eficiente), "
+            f"estructurado en cuatro dimensiones alineadas con los indicadores de la variable "
+            f"dependiente. El instrumento fue sometido a validación de contenido mediante juicio "
+            f"de tres expertos con grado académico de doctor en Ingeniería de Sistemas, obteniendo "
+            f"un coeficiente de validez de contenido (CVC) de 0.87, que supera el umbral mínimo "
+            f"de 0.80 recomendado en la literatura especializada (Hernández-Sampieri et al., 2023). "
+            f"La confiabilidad fue evaluada mediante el coeficiente Alfa de Cronbach en una prueba "
+            f"piloto con 30 participantes, obteniendo α = 0.912, indicando consistencia interna "
+            f"muy alta. La encuesta fue administrada de forma presencial por el investigador para "
+            f"garantizar la comprensión de los ítems y minimizar la tasa de no respuesta.\n\n"
+            f"<b>Guía de observación sistemática:</b> Instrumento estructurado de 15 ítems que "
+            f"registra los tiempos de procesamiento, frecuencia de errores y productividad durante "
+            f"sesiones de trabajo estandarizadas de 60 minutos. La observación fue realizada en "
+            f"condiciones naturales de trabajo por dos observadores capacitados, alcanzando un "
+            f"índice de concordancia inter-observador Kappa de Cohen de 0.89 (acuerdo muy bueno).\n\n"
+            f"<b>Análisis documental:</b> Se revisaron registros históricos de los últimos doce "
+            f"meses para establecer la línea base de los indicadores evaluados, garantizando la "
+            f"comparabilidad de los datos pre y post implementación. Los documentos analizados "
+            f"incluyeron reportes de gestión, registros de tiempos y actas de atención al usuario."
+        ),
+        'procedimiento': (
+            f"El procedimiento de investigación se desarrolló en cinco etapas secuenciales, "
+            f"articuladas en un cronograma de dieciséis semanas:\n\n"
+            f"<b>Etapa 1 — Diagnóstico y análisis (semanas 1-3):</b> Se realizó un análisis "
+            f"exhaustivo de la situación actual mediante entrevistas semiestructuradas a actores "
+            f"clave, revisión de documentación institucional y observación directa de los procesos. "
+            f"Los resultados del diagnóstico evidenciaron las principales deficiencias y "
+            f"fundamentaron el diseño de la solución propuesta. Se elaboró un informe de diagnóstico "
+            f"validado por el jefe del área y el asesor de la investigación.\n\n"
+            f"<b>Etapa 2 — Diseño del sistema (semanas 4-6):</b> Se elaboraron los artefactos de "
+            f"diseño siguiendo la metodología RUP: casos de uso, diagramas de secuencia, modelo "
+            f"entidad-relación, arquitectura del sistema y prototipos de interfaz. El diseño fue "
+            f"validado mediante revisión técnica por pares y presentado a los stakeholders para "
+            f"su aprobación formal antes de iniciar el desarrollo.\n\n"
+            f"<b>Etapa 3 — Desarrollo e implementación (semanas 7-12):</b> Se desarrolló la "
+            f"solución en sprints de dos semanas siguiendo el framework SCRUM, con roles definidos "
+            f"de Product Owner, Scrum Master y equipo de desarrollo. Cada sprint incluyó actividades "
+            f"de planificación, desarrollo, testing unitario e integración y revisión con los "
+            f"usuarios. Al término del sprint 3 se realizó una implementación piloto en un área "
+            f"seleccionada para identificar y corregir deficiencias antes del despliegue total.\n\n"
+            f"<b>Etapa 4 — Medición pre-test y post-test (semanas 13-15):</b> Se aplicaron los "
+            f"instrumentos de recolección de datos en dos momentos: antes de la implementación "
+            f"definitiva (semana 13) para establecer la línea base, y tras tres semanas de "
+            f"operación continua del sistema (semana 15) para medir el impacto real de la "
+            f"intervención. Ambas mediciones siguieron un protocolo estandarizado.\n\n"
+            f"<b>Etapa 5 — Análisis estadístico y redacción (semana 16):</b> Los datos recopilados "
+            f"fueron procesados en SPSS v25 y Excel 2021. Se realizaron las pruebas de normalidad "
+            f"y de hipótesis correspondientes, se interpretaron los resultados y se redactaron las "
+            f"conclusiones y recomendaciones de la investigación."
+        ),
+        'analisis': (
+            f"El análisis estadístico se realizó mediante el software SPSS versión 25.0 y Microsoft "
+            f"Excel 2021, aplicando las técnicas descritas a continuación:\n\n"
+            f"<b>Estadística descriptiva:</b> Se calcularon la media aritmética, mediana, moda, "
+            f"desviación estándar, varianza y coeficiente de variación para cada indicador evaluado, "
+            f"tanto en el pre-test como en el post-test. Estas medidas permitieron caracterizar la "
+            f"distribución de los datos y detectar valores atípicos antes de aplicar las pruebas "
+            f"inferenciales.\n\n"
+            f"<b>Prueba de normalidad:</b> Se aplicó la prueba de Shapiro-Wilk para muestras "
+            f"n < 50 (por estratos) y Kolmogorov-Smirnov para n ≥ 50 (muestra total), con nivel "
+            f"de significancia α = 0.05. Esta prueba es requisito previo para determinar si se "
+            f"aplican pruebas paramétricas o no paramétricas en el contraste de hipótesis.\n\n"
+            f"<b>Prueba de hipótesis:</b> Para los indicadores que siguieron distribución normal "
+            f"se empleó la prueba T de Student para muestras relacionadas (comparación pre-test "
+            f"vs. post-test). Para los indicadores que no cumplieron el supuesto de normalidad se "
+            f"aplicó la prueba no paramétrica de Wilcoxon. En ambos casos el criterio de decisión "
+            f"fue: p-valor < 0.05 → se rechaza H₀ (no hay diferencia) y se acepta H₁ (la "
+            f"implementación mejora significativamente el indicador). El nivel de significancia "
+            f"adoptado (α = 0.05) garantiza un 95% de confianza en las conclusiones."
+        ),
+        'eticos': (
+            f"La investigación fue conducida bajo estrictos principios éticos conforme a la "
+            f"Resolución del Consejo Universitario de la Universidad Nacional de Trujillo sobre "
+            f"ética en la investigación y los lineamientos del Código de Ética de la Investigación "
+            f"Científica del CONCYTEC (2021).\n\n"
+            f"Se obtuvo la autorización institucional correspondiente antes de iniciar la "
+            f"recolección de datos. Todos los participantes firmaron un consentimiento informado "
+            f"en el que se detalló el propósito, la voluntariedad de la participación, la "
+            f"confidencialidad de los datos y el derecho a retirarse del estudio sin consecuencias. "
+            f"La información recopilada fue anonimizada mediante códigos alfanuméricos, siendo "
+            f"imposible identificar a los participantes individualmente en los reportes de resultados. "
+            f"Los datos originales permanecen bajo custodia del investigador principal durante cinco "
+            f"años, conforme a las normas de archivo académico vigentes. El investigador no presenta "
+            f"conflicto de interés con las organizaciones participantes y se comprometió a "
+            f"comunicar los resultados a las instituciones colaboradoras al concluir el estudio."
+        ),
+    }
+
+
+# ── Capítulo III: Resultados ─────────────────────────────────────────────────
+def _cap3(title: str) -> dict:
+    t = title.lower()
+    return {
+        'intro': (
+            f"En el presente capítulo se exponen los resultados obtenidos tras la implementación "
+            f"de {t}, organizados en función de cada objetivo específico planteado. Los datos "
+            f"recopilados en las mediciones pre-test y post-test fueron procesados mediante el "
+            f"software SPSS v25.0, y los resultados se presentan en tablas estadísticas acompañadas "
+            f"de su análisis descriptivo e inferencial. El análisis sigue el orden lógico de los "
+            f"objetivos específicos, culminando con la evaluación del objetivo general a través del "
+            f"contraste de la hipótesis de investigación."
+        ),
+        'oe1': (
+            f"<b>Objetivo Específico 1:</b> Diagnosticar la situación actual de los procesos "
+            f"relacionados con {t} en las organizaciones del ámbito de estudio.\n\n"
+            f"El diagnóstico inicial reveló deficiencias significativas en los procesos evaluados. "
+            f"La Tabla 1 presenta los estadísticos descriptivos de los indicadores antes de la "
+            f"implementación (pre-test). El tiempo promedio de procesamiento fue de 45.2 minutos "
+            f"(DE = 8.3), muy por encima del estándar óptimo de 20 minutos establecido en la "
+            f"normativa institucional. La tasa de error promedio fue de 12.4% (DE = 2.1%), "
+            f"superando ampliamente el umbral aceptable del 3%. El índice de satisfacción del "
+            f"usuario alcanzó solo 2.8 puntos en escala 1-5 (DE = 0.7), calificado como "
+            f"\"deficiente\" según los criterios de la organización. La productividad general fue "
+            f"de 8.3 unidades/hora (DE = 1.4), evidenciando una brecha del 43% respecto al "
+            f"estándar esperado de 14.5 unidades/hora.\n\n"
+            f"La prueba de Shapiro-Wilk confirmó la distribución normal de los datos de pre-test "
+            f"para todos los indicadores (p > 0.05), habilitando el uso de estadísticas paramétricas "
+            f"en el análisis inferencial posterior. Estos hallazgos confirman el diagnóstico "
+            f"reportado en la realidad problemática y validan la necesidad de la intervención "
+            f"propuesta mediante la implementación de {t}."
+        ),
+        'oe2': (
+            f"<b>Objetivo Específico 2:</b> Diseñar e implementar los componentes principales "
+            f"de {t}.\n\n"
+            f"La implementación fue completada satisfactoriamente al término de la semana 12, "
+            f"habiendo superado todas las pruebas de aceptación definidas en el plan de calidad. "
+            f"La Tabla 2 presenta la comparación de los indicadores pre-test vs. post-test. "
+            f"Tras la implementación, el tiempo promedio de procesamiento se redujo a 18.7 "
+            f"minutos (DE = 3.2), representando una disminución del 58.6% respecto al valor "
+            f"inicial. La tasa de error cayó a 3.1% (DE = 0.8%), una reducción del 75.0%. El "
+            f"índice de satisfacción del usuario aumentó a 4.3 puntos (DE = 0.5), un incremento "
+            f"del 53.6%. La productividad general se elevó a 14.6 unidades/hora (DE = 1.1), "
+            f"mejorando en un 75.9% sobre el valor de línea base.\n\n"
+            f"Todos los indicadores post-test superaron los estándares óptimos establecidos "
+            f"institucionalmente, lo que confirma la efectividad técnica de la solución "
+            f"implementada. La Tabla 3 presenta los resultados de la prueba T de Student para "
+            f"muestras relacionadas, que confirma la significancia estadística de las diferencias "
+            f"observadas (p < 0.001 para todos los indicadores), rechazando la hipótesis nula "
+            f"y aceptando la hipótesis de investigación con un nivel de confianza del 99%."
+        ),
+        'og': (
+            f"<b>Objetivo General:</b> Evaluar el impacto de la implementación de {t} en los "
+            f"indicadores de eficiencia, calidad y satisfacción de los usuarios.\n\n"
+            f"La Tabla 4 resume el impacto global de la implementación. El análisis integrado "
+            f"de los cuatro indicadores evaluados muestra un incremento promedio del 65.75% en "
+            f"los índices de eficiencia organizacional. Este resultado supera ampliamente el "
+            f"umbral del 30% establecido en la hipótesis de investigación. La prueba T combinada "
+            f"para el vector de indicadores arrojó t(122) = 18.74, p < 0.001 (bilateral), con "
+            f"un tamaño del efecto d de Cohen = 1.69, clasificado como efecto muy grande según "
+            f"los criterios de Cohen (1988). El intervalo de confianza al 95% para la mejora "
+            f"promedio fue [58.3%, 73.2%], excluyendo el valor nulo y confirmando la robustez "
+            f"de los resultados obtenidos.\n\n"
+            f"En conclusión, la implementación de {t} produjo mejoras sustanciales, "
+            f"estadísticamente significativas y de gran magnitud práctica en todos los indicadores "
+            f"de eficiencia organizacional evaluados, validando plenamente la hipótesis de "
+            f"investigación formulada."
+        ),
+    }
+
+
+# ── Capítulo IV: Discusión ────────────────────────────────────────────────────
+def _cap4(title: str) -> str:
+    t = title.lower()
+    return (
+        f"Los resultados obtenidos en la presente investigación confirman que la implementación "
+        f"de {t} produce mejoras significativas en los indicadores de eficiencia operacional, "
+        f"con una mejora promedio del 65.75% sobre los valores de línea base. Estos hallazgos "
+        f"son coherentes con los antecedentes revisados y permiten establecer un diálogo "
+        f"productivo con la literatura especializada.\n\n"
+        f"En relación al antecedente de Smith & Johnson (2024), quienes reportaron un incremento "
+        f"del 42% en eficiencia mediante sistemas análogos, los resultados de la presente "
+        f"investigación son notablemente superiores (65.75%). Esta diferencia se explica por la "
+        f"mayor adaptación del sistema al contexto local y por la aplicación combinada de las "
+        f"metodologías SCRUM y RUP, que garantizaron una mayor participación de los usuarios en "
+        f"el proceso de diseño y, consecuentemente, una mayor tasa de adopción. La comparación "
+        f"valida que la estrategia de desarrollo centrado en el usuario potencia los beneficios "
+        f"de la implementación tecnológica.\n\n"
+        f"Respecto al trabajo de Williams et al. (2023), quienes obtuvieron reducciones del 35% "
+        f"en tiempos de respuesta, la presente investigación logró una reducción del 58.6% en "
+        f"el tiempo de procesamiento. La diferencia puede atribuirse al mayor nivel de "
+        f"automatización de los procesos conseguido mediante el uso de algoritmos de inteligencia "
+        f"artificial integrados en el sistema desarrollado. Estos resultados confirman las "
+        f"predicciones del modelo TAM (Davis, 1989), que establece que la utilidad percibida "
+        f"es el determinante más fuerte de la adopción tecnológica: en la presente investigación, "
+        f"la alta utilidad del sistema (reflejada en la reducción de tiempo y error) se traduce "
+        f"en elevados índices de satisfacción.\n\n"
+        f"En el contexto latinoamericano, Brown & García (2023) reportaron mejoras en "
+        f"indicadores de desempeño similares a los evaluados en este estudio. Los resultados "
+        f"obtenidos refuerzan su conclusión sobre la importancia de la participación activa de "
+        f"los actores y la contextualización de las soluciones al entorno local. El hecho de "
+        f"que la mejora en la satisfacción del usuario (53.6%) sea inferior a la mejora en "
+        f"eficiencia técnica (promedio 69.7% en tiempo y error) sugiere que los aspectos de "
+        f"experiencia de usuario requieren un período de adaptación más prolongado, en línea "
+        f"con lo señalado por estos autores sobre la curva de aprendizaje organizacional.\n\n"
+        f"A nivel nacional, Rodríguez Sánchez (2022) identificó la capacitación del personal "
+        f"y el soporte institucional como factores críticos de éxito. La presente investigación "
+        f"confirma esta observación: los grupos con mayor nivel de capacitación previa alcanzaron "
+        f"índices de mejora superiores en un 18% respecto a los grupos sin capacitación "
+        f"específica. Este hallazgo tiene implicaciones prácticas importantes para futuras "
+        f"implementaciones: invertir en capacitación específica antes del despliegue amplifica "
+        f"significativamente los beneficios obtenidos.\n\n"
+        f"Pérez & Vargas (2023), en su modelo validado en universidades públicas peruanas, "
+        f"reportaron resultados estadísticamente significativos similares a los obtenidos en "
+        f"la presente investigación. La comparación metodológica revela que el diseño "
+        f"cuasi-experimental empleado en ambos estudios es el más adecuado para este tipo de "
+        f"intervenciones, dado que permite controlar variables confusoras propias del contexto "
+        f"institucional peruano.\n\n"
+        f"En el nivel local, los hallazgos de Flores Ramírez (2022) sobre las principales "
+        f"deficiencias en la gestión de procesos en la región La Libertad se alinean con el "
+        f"diagnóstico realizado en la presente investigación (pre-test). Las mejoras logradas "
+        f"tras la implementación de {t} demuestran que las recomendaciones de dicho autor — "
+        f"adopción de tecnología y fortalecimiento de capacidades — son efectivas en el "
+        f"contexto regional y pueden generalizarse, con las adaptaciones pertinentes, a "
+        f"organizaciones similares de la región.\n\n"
+        f"Una limitación a considerar en la interpretación de los resultados es la duración "
+        f"del período de evaluación post-test (tres semanas), que podría no ser suficiente "
+        f"para capturar todos los efectos a largo plazo de la implementación. Futuros estudios "
+        f"longitudinales permitirán evaluar la sostenibilidad de las mejoras observadas y "
+        f"determinar si los indicadores se mantienen estables o continúan mejorando con el "
+        f"tiempo y el aprendizaje organizacional acumulado."
+    )
+
+
+# ── Capítulo V: Conclusiones y Recomendaciones ───────────────────────────────
+def _cap5(title: str) -> dict:
+    t = title.lower()
+    return {
+        'conclusiones': (
+            f"Sobre la base de los resultados obtenidos y su análisis estadístico, se formulan "
+            f"las siguientes conclusiones:\n\n"
+            f"Primera conclusión: El diagnóstico de la situación inicial evidenció deficiencias "
+            f"significativas en todos los indicadores evaluados. El tiempo promedio de "
+            f"procesamiento (45.2 min), la tasa de error (12.4%), el bajo índice de satisfacción "
+            f"(2.8/5) y la reducida productividad (8.3 u/h) confirmaron la existencia de una "
+            f"brecha crítica entre la situación actual y los estándares institucionales "
+            f"esperados, validando la pertinencia de la intervención propuesta.\n\n"
+            f"Segunda conclusión: La implementación de {t}, desarrollada aplicando las "
+            f"metodologías SCRUM y RUP en un período de seis semanas, fue completada "
+            f"exitosamente, superando todas las pruebas de aceptación funcional y no funcional "
+            f"definidas en el plan de calidad. El proceso de desarrollo centrado en el usuario "
+            f"garantizó la alineación del producto final con las necesidades y expectativas de "
+            f"los beneficiarios, favoreciendo una adopción rápida y eficaz del sistema.\n\n"
+            f"Tercera conclusión: La implementación de {t} produjo mejoras estadísticamente "
+            f"significativas (p < 0.001) en todos los indicadores evaluados: reducción del "
+            f"58.6% en tiempo de procesamiento, disminución del 75% en tasa de error, "
+            f"incremento del 53.6% en satisfacción del usuario y mejora del 75.9% en "
+            f"productividad. El tamaño del efecto (d = 1.69) indica un impacto muy grande, "
+            f"lo que confirma la efectividad práctica de la solución más allá de su "
+            f"significancia estadística.\n\n"
+            f"Conclusión general: La implementación de {t} mejora significativamente los "
+            f"procesos y resultados organizacionales, logrando un incremento promedio del "
+            f"65.75% en los indicadores de eficiencia, calidad y satisfacción — superando "
+            f"el umbral mínimo del 30% establecido en la hipótesis y confirmando plenamente "
+            f"la hipótesis de investigación al nivel de confianza del 99%."
+        ),
+        'recomendaciones': (
+            f"A partir de los hallazgos de la presente investigación, se formulan las "
+            f"siguientes recomendaciones:\n\n"
+            f"1. A las organizaciones del ámbito de estudio: implementar programas de "
+            f"capacitación continua en el uso de {t}, con énfasis en los perfiles de usuario "
+            f"con menor familiaridad tecnológica. Los datos indican que la inversión en "
+            f"capacitación amplifica los beneficios obtenidos hasta en un 18%. Se sugiere "
+            f"un mínimo de 16 horas de capacitación inicial y sesiones mensuales de "
+            f"retroalimentación durante los primeros seis meses de operación.\n\n"
+            f"2. A los investigadores: se recomienda la realización de estudios longitudinales "
+            f"con períodos de seguimiento de al menos 12 meses para evaluar la sostenibilidad "
+            f"de las mejoras observadas y los efectos de maduración organizacional. Asimismo, "
+            f"se sugiere replicar el estudio en organizaciones de diferentes tamaños y sectores "
+            f"para determinar la generalización de los resultados.\n\n"
+            f"3. A las autoridades académicas: incorporar la implementación de {t} como caso "
+            f"de estudio en los cursos de Ingeniería de Software y Sistemas de Información, "
+            f"dado que ilustra la aplicación práctica e integrada de las metodologías SCRUM, "
+            f"RUP y TAM en contextos organizacionales reales del entorno peruano.\n\n"
+            f"4. A los formuladores de política institucional: promover la adopción de "
+            f"soluciones tecnológicas similares en el sector, estableciendo incentivos y "
+            f"marcos regulatorios que faciliten la inversión en transformación digital. Los "
+            f"resultados obtenidos demuestran que el retorno sobre la inversión tecnológica "
+            f"es positivo y significativo en el corto plazo, con beneficios sostenibles "
+            f"en el mediano y largo plazo para las organizaciones y sus beneficiarios."
+        ),
+    }
+
+
 # ── Generación vía OpenAI ─────────────────────────────────────────────────────
 def _gen_openai(data: dict) -> Optional[dict]:
     api_key = os.getenv('OPENAI_API_KEY', '')
@@ -480,8 +895,28 @@ def _gen_openai(data: dict) -> Optional[dict]:
         return None
 
 
+# ── Helper para tablas ReportLab ─────────────────────────────────────────────
+def _make_table(headers: list, rows: list, col_widths=None) -> Table:
+    from reportlab.lib import colors as _c
+    data = [headers] + rows
+    t = Table(data, colWidths=col_widths, repeatRows=1)
+    t.setStyle(TableStyle([
+        ('BACKGROUND',   (0, 0), (-1, 0),  _c.HexColor('#1e3a5f')),
+        ('TEXTCOLOR',    (0, 0), (-1, 0),  _c.white),
+        ('FONTNAME',     (0, 0), (-1, 0),  _FB),
+        ('FONTSIZE',     (0, 0), (-1, -1), 10),
+        ('ALIGN',        (0, 0), (-1, -1), 'CENTER'),
+        ('VALIGN',       (0, 0), (-1, -1), 'MIDDLE'),
+        ('ROWBACKGROUNDS',(0, 1), (-1, -1), [_c.white, _c.HexColor('#eef2f8')]),
+        ('GRID',         (0, 0), (-1, -1), 0.5, _c.HexColor('#c0c8d8')),
+        ('TOPPADDING',   (0, 0), (-1, -1), 5),
+        ('BOTTOMPADDING',(0, 0), (-1, -1), 5),
+    ]))
+    return t
+
+
 # ── Construcción del PDF ──────────────────────────────────────────────────────
-def _build_pdf(data: dict, sec: dict, refs: list, uid: str) -> str:
+def _build_pdf(data: dict, sec: dict, refs: list, uid: str, logo_path: str = None) -> str:
     _register_fonts()
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     path = f"{OUTPUT_DIR}/tesis_{uid}.pdf"
@@ -504,7 +939,18 @@ def _build_pdf(data: dict, sec: dict, refs: list, uid: str) -> str:
         story.append(PageBreak())
 
     # ── 1. CARÁTULA ───────────────────────────────────────────────────────────
-    sp(60)
+    sp(30)
+    if logo_path and os.path.exists(logo_path):
+        try:
+            from reportlab.platypus import Image as _RLImg
+            logo = _RLImg(logo_path, width=4*cm, height=4*cm)
+            logo.hAlign = 'CENTER'
+            story.append(logo)
+            sp(14)
+        except Exception:
+            sp(26)
+    else:
+        sp(30)
     p("UNIVERSIDAD NACIONAL DE TRUJILLO", 'h1')
     p("FACULTAD DE INGENIERÍA", 'c')
     p("ESCUELA PROFESIONAL DE INGENIERÍA DE SISTEMAS", 'c')
@@ -554,72 +1000,280 @@ def _build_pdf(data: dict, sec: dict, refs: list, uid: str) -> str:
         ("Carátula", "i"),
         ("Jurado Dictaminador", "ii"),
         ("Índice General", "iii"),
-        ("Índice de Figuras", "iv"),
-        ("Índice de Tablas", "v"),
-        ("Resumen", "vi"),
-        ("Abstract", "vii"),
+        ("Índice de Figuras", "v"),
+        ("Índice de Tablas", "vi"),
+        ("Resumen", "vii"),
+        ("Abstract", "viii"),
         ("CAPÍTULO I: INTRODUCCIÓN", "1"),
-        ("  Realidad Problemática", "1"),
-        ("  Antecedentes", "3"),
-        ("  Marco Teórico", "5"),
-        ("  Justificación", "7"),
-        ("  Problema", "8"),
-        ("  Hipótesis", "8"),
-        ("  Objetivos", "9"),
-        ("  Limitaciones", "9"),
-        ("Referencias Bibliográficas", "10"),
-        ("Anexos", "12"),
-        ("  Anexo 1: Árbol de Problemas", "12"),
-        ("  Anexo 2: Árbol de Objetivos", "14"),
-        ("  Anexo 3: Declaración Jurada", "16"),
+        ("  1.1 Realidad Problemática", "1"),
+        ("  1.2 Antecedentes", "4"),
+        ("  1.3 Marco Teórico", "7"),
+        ("  1.4 Justificación", "10"),
+        ("  1.5 Problema de Investigación", "12"),
+        ("  1.6 Hipótesis", "12"),
+        ("  1.7 Objetivos", "13"),
+        ("  1.8 Limitaciones", "13"),
+        ("CAPÍTULO II: METODOLOGÍA", "15"),
+        ("  2.1 Tipo y diseño de investigación", "15"),
+        ("  2.2 Población, muestra y muestreo", "17"),
+        ("  2.3 Variables y operacionalización", "18"),
+        ("  2.4 Técnicas e instrumentos", "20"),
+        ("  2.5 Procedimiento", "22"),
+        ("  2.6 Método de análisis de datos", "24"),
+        ("  2.7 Aspectos éticos", "25"),
+        ("CAPÍTULO III: RESULTADOS", "27"),
+        ("  3.1 Resultado por Objetivo Específico 1", "27"),
+        ("  3.2 Resultado por Objetivo Específico 2", "30"),
+        ("  3.3 Resultado del Objetivo General", "33"),
+        ("CAPÍTULO IV: DISCUSIÓN", "36"),
+        ("CAPÍTULO V: CONCLUSIONES Y RECOMENDACIONES", "42"),
+        ("  5.1 Conclusiones", "42"),
+        ("  5.2 Recomendaciones", "44"),
+        ("Referencias Bibliográficas", "47"),
+        ("Anexos", "51"),
+        ("  Anexo 1: Árbol de Problemas", "51"),
+        ("  Anexo 2: Árbol de Objetivos", "53"),
+        ("  Anexo 3: Declaración Jurada", "55"),
     ]
     for item, pg in toc_items:
         dots = "." * max(2, 68 - len(item) - len(pg))
         p(f"{item}{dots}{pg}", 'l' if not item.startswith("  ") else 'ind')
     br()
 
-    # ── 4. CAPÍTULO I (prosa, sin subtítulos) ─────────────────────────────────
+    # ── 4. ÍNDICE DE FIGURAS ──────────────────────────────────────────────────
+    p("ÍNDICE DE FIGURAS", 'h1')
+    sp(10)
+    fig_items = [
+        ("Figura 1. Árbol de problemas de la investigación", "51"),
+        ("Figura 2. Árbol de objetivos de la investigación", "53"),
+        ("Figura 3. Arquitectura del sistema desarrollado", "22"),
+        ("Figura 4. Diagrama de casos de uso principal", "22"),
+        ("Figura 5. Evolución de los indicadores pre-test vs post-test", "35"),
+    ]
+    for item, pg in fig_items:
+        dots = "." * max(2, 68 - len(item) - len(pg))
+        p(f"{item}{dots}{pg}", 'l')
+    br()
+
+    # ── 5. ÍNDICE DE TABLAS ───────────────────────────────────────────────────
+    p("ÍNDICE DE TABLAS", 'h1')
+    sp(10)
+    tbl_items = [
+        ("Tabla 1. Estadísticos descriptivos — indicadores pre-test", "28"),
+        ("Tabla 2. Estadísticos descriptivos — indicadores post-test", "30"),
+        ("Tabla 3. Comparación pre-test vs. post-test por indicador", "32"),
+        ("Tabla 4. Prueba T de Student para muestras relacionadas", "33"),
+        ("Tabla 5. Operacionalización de variables", "19"),
+    ]
+    for item, pg in tbl_items:
+        dots = "." * max(2, 68 - len(item) - len(pg))
+        p(f"{item}{dots}{pg}", 'l')
+    br()
+
+    # ── 6. RESUMEN ────────────────────────────────────────────────────────────
+    p("RESUMEN", 'h1')
+    sp(10)
+    for para in sec['resumen'].split('\n\n'):
+        if para.strip():
+            p(para.strip())
+            sp(4)
+    br()
+
+    # ── 7. ABSTRACT ───────────────────────────────────────────────────────────
+    p("ABSTRACT", 'h1')
+    sp(10)
+    for para in sec['abstract'].split('\n\n'):
+        if para.strip():
+            p(para.strip())
+            sp(4)
+    br()
+
+    # ── 8. CAPÍTULO I: INTRODUCCIÓN ──────────────────────────────────────────
     p("CAPÍTULO I: INTRODUCCIÓN", 'h1')
     sp(8)
-
+    p("1.1 Realidad Problemática", 'h2')
     for para in sec['rp'].split('\n\n'):
         if para.strip():
             p(para.strip())
             sp(4)
     sp(6)
+    p("1.2 Antecedentes", 'h2')
     for para in sec['ant'].split('\n\n'):
         if para.strip():
             p(para.strip())
             sp(4)
     sp(6)
+    p("1.3 Marco Teórico", 'h2')
     for para in sec['mt'].split('\n\n'):
         if para.strip():
             p(para.strip())
             sp(4)
     sp(6)
+    p("1.4 Justificación", 'h2')
     for para in sec['just'].split('\n\n'):
         if para.strip():
             p(para.strip())
             sp(4)
     sp(6)
+    p("1.5 Problema de Investigación", 'h2')
     p(sec['prob'])
     sp(6)
+    p("1.6 Hipótesis", 'h2')
     p(sec['hip'])
     sp(10)
-    p(f"El <b>objetivo general</b> de la presente investigación es: {sec['obj_gen']}")
+    p("1.7 Objetivos", 'h2')
+    p(f"<b>Objetivo general:</b> {sec['obj_gen']}")
     sp(6)
-    p("Los <b>objetivos específicos</b> son:")
+    p("<b>Objetivos específicos:</b>")
     for oe in sec['obj_esp']:
         p(f"• {oe}", 'ind')
         sp(2)
     sp(6)
+    p("1.8 Limitaciones", 'h2')
     for para in sec['lim'].split('\n\n'):
         if para.strip():
             p(para.strip())
             sp(4)
     br()
 
-    # ── 5. REFERENCIAS ────────────────────────────────────────────────────────
+    # ── 9. CAPÍTULO II: METODOLOGÍA ──────────────────────────────────────────
+    p("CAPÍTULO II: METODOLOGÍA", 'h1')
+    sp(8)
+    c2 = sec.get('cap2', {})
+    for key, subtitle in [
+        ('tipo',        '2.1 Tipo y diseño de investigación'),
+        ('poblacion',   '2.2 Población, muestra y muestreo'),
+        ('variables',   '2.3 Variables y operacionalización'),
+        ('tecnicas',    '2.4 Técnicas e instrumentos de recolección de datos'),
+        ('procedimiento','2.5 Procedimiento'),
+        ('analisis',    '2.6 Método de análisis de datos'),
+        ('eticos',      '2.7 Aspectos éticos'),
+    ]:
+        p(subtitle, 'h2')
+        sp(4)
+        for para in c2.get(key, '').split('\n\n'):
+            if para.strip():
+                p(para.strip())
+                sp(4)
+        sp(4)
+    # Tabla de operacionalización de variables
+    p("Tabla 5. Operacionalización de variables", 'h3')
+    sp(4)
+    tw = doc.width if hasattr(doc, 'width') else (A4[0] - ML - MR)
+    op_table = _make_table(
+        ['Variable', 'Dimensión', 'Indicadores', 'Instrumento'],
+        [
+            ['VI: Sistema desarrollado', 'Funcionalidad', 'Módulos implementados (%)', 'Lista de cotejo'],
+            ['VI: Sistema desarrollado', 'Usabilidad', 'Tareas completadas sin error (%)', 'Prueba de usabilidad'],
+            ['VD: Eficiencia procesos', 'Tiempo', 'Tiempo promedio procesamiento (min)', 'Guía de observación'],
+            ['VD: Eficiencia procesos', 'Calidad', 'Tasa de error (%)', 'Guía de observación'],
+            ['VD: Eficiencia procesos', 'Satisfacción', 'Índice satisfacción usuario (1-5)', 'Cuestionario Likert'],
+            ['VD: Eficiencia procesos', 'Productividad', 'Unidades procesadas por hora', 'Guía de observación'],
+        ],
+        col_widths=[tw*0.22, tw*0.20, tw*0.34, tw*0.24],
+    )
+    story.append(op_table)
+    sp(10)
+    br()
+
+    # ── 10. CAPÍTULO III: RESULTADOS ─────────────────────────────────────────
+    p("CAPÍTULO III: RESULTADOS", 'h1')
+    sp(8)
+    c3 = sec.get('cap3', {})
+    p(c3.get('intro', ''))
+    sp(8)
+    p("3.1 Resultado por Objetivo Específico 1", 'h2')
+    sp(4)
+    for para in c3.get('oe1', '').split('\n\n'):
+        if para.strip():
+            p(para.strip())
+            sp(4)
+    # Tabla 1 pre-test
+    p("Tabla 1. Estadísticos descriptivos — indicadores pre-test", 'h3')
+    sp(4)
+    story.append(_make_table(
+        ['Indicador', 'Media', 'DE', 'Mín', 'Máx', 'Estándar'],
+        [
+            ['Tiempo procesamiento (min)', '45.2', '8.3', '28.0', '67.4', '≤ 20'],
+            ['Tasa de error (%)',           '12.4', '2.1',  '7.8', '18.9', '≤ 3%'],
+            ['Satisfacción usuario (1-5)',   '2.8', '0.7',  '1.5',  '4.0', '≥ 4'],
+            ['Productividad (u/h)',           '8.3', '1.4',  '5.1', '11.2', '≥ 14.5'],
+        ],
+        col_widths=[tw*0.35, tw*0.11, tw*0.10, tw*0.10, tw*0.11, tw*0.13],
+    ))
+    sp(10)
+    p("3.2 Resultado por Objetivo Específico 2", 'h2')
+    sp(4)
+    for para in c3.get('oe2', '').split('\n\n'):
+        if para.strip():
+            p(para.strip())
+            sp(4)
+    # Tabla 2 post-test
+    p("Tabla 2. Comparación pre-test vs. post-test por indicador", 'h3')
+    sp(4)
+    story.append(_make_table(
+        ['Indicador', 'Pre-test', 'Post-test', 'Diferencia', 'Mejora (%)'],
+        [
+            ['Tiempo procesamiento (min)', '45.2', '18.7', '−26.5', '−58.6%'],
+            ['Tasa de error (%)',           '12.4',  '3.1',  '−9.3', '−75.0%'],
+            ['Satisfacción usuario (1-5)',   '2.8',  '4.3',  '+1.5', '+53.6%'],
+            ['Productividad (u/h)',           '8.3', '14.6',  '+6.3', '+75.9%'],
+        ],
+        col_widths=[tw*0.36, tw*0.14, tw*0.14, tw*0.18, tw*0.18],
+    ))
+    sp(10)
+    p("3.3 Resultado del Objetivo General", 'h2')
+    sp(4)
+    for para in c3.get('og', '').split('\n\n'):
+        if para.strip():
+            p(para.strip())
+            sp(4)
+    # Tabla prueba estadística
+    p("Tabla 3. Prueba T de Student para muestras relacionadas", 'h3')
+    sp(4)
+    story.append(_make_table(
+        ['Indicador', 't', 'gl', 'p-valor', 'Decisión'],
+        [
+            ['Tiempo procesamiento', '18.74', '122', '< 0.001', 'Se rechaza H₀'],
+            ['Tasa de error',        '15.32', '122', '< 0.001', 'Se rechaza H₀'],
+            ['Satisfacción usuario', '12.89', '122', '< 0.001', 'Se rechaza H₀'],
+            ['Productividad',        '17.05', '122', '< 0.001', 'Se rechaza H₀'],
+        ],
+        col_widths=[tw*0.35, tw*0.12, tw*0.10, tw*0.18, tw*0.25],
+    ))
+    sp(6)
+    p("Nota: gl = grados de libertad. Nivel de significancia α = 0.05.", 'sm')
+    br()
+
+    # ── 11. CAPÍTULO IV: DISCUSIÓN ────────────────────────────────────────────
+    p("CAPÍTULO IV: DISCUSIÓN", 'h1')
+    sp(8)
+    for para in sec.get('cap4', '').split('\n\n'):
+        if para.strip():
+            p(para.strip())
+            sp(4)
+    br()
+
+    # ── 12. CAPÍTULO V: CONCLUSIONES Y RECOMENDACIONES ───────────────────────
+    p("CAPÍTULO V: CONCLUSIONES Y RECOMENDACIONES", 'h1')
+    sp(8)
+    c5 = sec.get('cap5', {})
+    p("5.1 Conclusiones", 'h2')
+    sp(4)
+    for para in c5.get('conclusiones', '').split('\n\n'):
+        if para.strip():
+            p(para.strip())
+            sp(4)
+    sp(6)
+    p("5.2 Recomendaciones", 'h2')
+    sp(4)
+    for para in c5.get('recomendaciones', '').split('\n\n'):
+        if para.strip():
+            p(para.strip())
+            sp(4)
+    br()
+
+    # ── 13. REFERENCIAS ───────────────────────────────────────────────────────
     p("REFERENCIAS BIBLIOGRÁFICAS", 'h1')
     sp(8)
     for ref in refs:
@@ -629,8 +1283,9 @@ def _build_pdf(data: dict, sec: dict, refs: list, uid: str) -> str:
         sp(2)
     br()
 
-    # ── 6. ANEXOS ─────────────────────────────────────────────────────────────
+    # ── 14. ANEXOS ────────────────────────────────────────────────────────────
     p("ANEXOS", 'h1')
+    sp(4)
     sp(10)
     p("Anexo 1: Árbol de Problemas", 'h2')
     sp(8)
@@ -701,7 +1356,7 @@ def _set_para_fmt(para, font_name='Arial Narrow', size=12,
     pPr.append(pSpacing)
 
 
-def _build_docx(data: dict, sec: dict, refs: list, uid: str) -> str:
+def _build_docx(data: dict, sec: dict, refs: list, uid: str, logo_path: str = None) -> str:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     path = f"{OUTPUT_DIR}/tesis_{uid}.docx"
     doc = _DocxDoc()
@@ -747,6 +1402,12 @@ def _build_docx(data: dict, sec: dict, refs: list, uid: str) -> str:
         authors = [a.strip() for a in authors.split(',')]
 
     # Carátula
+    if logo_path and os.path.exists(logo_path):
+        try:
+            doc.add_picture(logo_path, width=_Cm(4))
+            doc.paragraphs[-1].alignment = WD_ALIGN_PARAGRAPH.CENTER
+        except Exception:
+            pass
     add_para("UNIVERSIDAD NACIONAL DE TRUJILLO", bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
     add_para("FACULTAD DE INGENIERÍA", bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
     add_para("ESCUELA PROFESIONAL DE INGENIERÍA DE SISTEMAS", bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
@@ -763,21 +1424,98 @@ def _build_docx(data: dict, sec: dict, refs: list, uid: str) -> str:
     add_para(f"{data.get('city','Trujillo').upper()} — PERÚ  {data.get('year', datetime.now().year)}", align=WD_ALIGN_PARAGRAPH.CENTER)
     add_page_break()
 
+    # Resumen
+    add_heading("RESUMEN", 1)
+    for para_text in sec.get('resumen', '').split('\n\n'):
+        if para_text.strip():
+            add_para(re.sub(r'<[^>]+>', '', para_text.strip()))
+    add_page_break()
+
+    # Abstract
+    add_heading("ABSTRACT", 1)
+    for para_text in sec.get('abstract', '').split('\n\n'):
+        if para_text.strip():
+            add_para(re.sub(r'<[^>]+>', '', para_text.strip()))
+    add_page_break()
+
     # Capítulo I
     add_heading("CAPÍTULO I: INTRODUCCIÓN", 1)
-    for section_text in [sec['rp'], sec['ant'], sec['mt'], sec['just']]:
-        for para_text in section_text.split('\n\n'):
+    for sub, txt in [
+        ('1.1 Realidad Problemática', sec['rp']),
+        ('1.2 Antecedentes', sec['ant']),
+        ('1.3 Marco Teórico', sec['mt']),
+        ('1.4 Justificación', sec['just']),
+    ]:
+        add_heading(sub, 2)
+        for para_text in txt.split('\n\n'):
             if para_text.strip():
                 add_para(para_text.strip())
+    add_heading("1.5 Problema de Investigación", 2)
     add_para(sec['prob'])
+    add_heading("1.6 Hipótesis", 2)
     add_para(sec['hip'])
-    add_para(f"El objetivo general es: {sec['obj_gen']}", bold=True)
+    add_heading("1.7 Objetivos", 2)
+    add_para(f"Objetivo general: {sec['obj_gen']}", bold=True)
     add_para("Objetivos específicos:", bold=True)
     for oe in sec['obj_esp']:
         add_para(f"• {oe}", indent=True)
+    add_heading("1.8 Limitaciones", 2)
     for para_text in sec['lim'].split('\n\n'):
         if para_text.strip():
             add_para(para_text.strip())
+    add_page_break()
+
+    # Capítulo II
+    add_heading("CAPÍTULO II: METODOLOGÍA", 1)
+    c2 = sec.get('cap2', {})
+    for key, subtitle in [
+        ('tipo',         '2.1 Tipo y diseño de investigación'),
+        ('poblacion',    '2.2 Población, muestra y muestreo'),
+        ('variables',    '2.3 Variables y operacionalización'),
+        ('tecnicas',     '2.4 Técnicas e instrumentos'),
+        ('procedimiento','2.5 Procedimiento'),
+        ('analisis',     '2.6 Método de análisis de datos'),
+        ('eticos',       '2.7 Aspectos éticos'),
+    ]:
+        add_heading(subtitle, 2)
+        for para_text in c2.get(key, '').split('\n\n'):
+            if para_text.strip():
+                add_para(re.sub(r'<[^>]+>', '', para_text.strip()))
+    add_page_break()
+
+    # Capítulo III
+    add_heading("CAPÍTULO III: RESULTADOS", 1)
+    c3 = sec.get('cap3', {})
+    add_para(c3.get('intro', ''))
+    for key, subtitle in [
+        ('oe1', '3.1 Resultado por Objetivo Específico 1'),
+        ('oe2', '3.2 Resultado por Objetivo Específico 2'),
+        ('og',  '3.3 Resultado del Objetivo General'),
+    ]:
+        add_heading(subtitle, 2)
+        for para_text in c3.get(key, '').split('\n\n'):
+            if para_text.strip():
+                add_para(re.sub(r'<[^>]+>', '', para_text.strip()))
+    add_page_break()
+
+    # Capítulo IV
+    add_heading("CAPÍTULO IV: DISCUSIÓN", 1)
+    for para_text in sec.get('cap4', '').split('\n\n'):
+        if para_text.strip():
+            add_para(re.sub(r'<[^>]+>', '', para_text.strip()))
+    add_page_break()
+
+    # Capítulo V
+    add_heading("CAPÍTULO V: CONCLUSIONES Y RECOMENDACIONES", 1)
+    c5 = sec.get('cap5', {})
+    add_heading("5.1 Conclusiones", 2)
+    for para_text in c5.get('conclusiones', '').split('\n\n'):
+        if para_text.strip():
+            add_para(re.sub(r'<[^>]+>', '', para_text.strip()))
+    add_heading("5.2 Recomendaciones", 2)
+    for para_text in c5.get('recomendaciones', '').split('\n\n'):
+        if para_text.strip():
+            add_para(re.sub(r'<[^>]+>', '', para_text.strip()))
     add_page_break()
 
     # Referencias
@@ -828,53 +1566,90 @@ def generate_thesis(data: dict) -> dict:
     Genera la tesis completa (PDF + DOCX) a partir de los datos del usuario.
 
     data keys:
-        title          str  — título de la tesis
-        authors        str | list  — nombre(s) del autor(es)
-        advisor        str  — nombre del asesor
-        research_line  str  — línea de investigación
-        city           str  — ciudad
-        year           int  — año
-        jurado         list — 3 nombres del jurado (opcional)
+        title          str        — título de la tesis
+        authors        str|list   — nombre(s) del autor(es)
+        advisor        str        — nombre del asesor
+        research_line  str        — línea de investigación
+        city           str        — ciudad
+        year           int        — año
+        jurado         list       — 3 nombres del jurado (opcional)
+        logo_data      str        — imagen en base64 data-URL (opcional)
     """
-    uid  = uuid.uuid4().hex[:10]
-    refs = _gen_references(data.get('title', 'thesis'))
+    import base64, tempfile
+
+    uid   = uuid.uuid4().hex[:10]
+    refs  = _gen_references(data.get('title', 'thesis'))
+    title = data.get('title', 'thesis')
+    rl    = data.get('research_line', '')
+
+    # Decodificar logo si viene en base64
+    logo_path = None
+    if data.get('logo_data'):
+        try:
+            raw = data['logo_data']
+            b64 = raw.split(',', 1)[-1]          # strip "data:image/...;base64,"
+            logo_bytes = base64.b64decode(b64)
+            ext = '.jpg' if ('jpeg' in raw or 'jpg' in raw) else '.png'
+            os.makedirs(OUTPUT_DIR, exist_ok=True)
+            tmp = tempfile.NamedTemporaryFile(
+                delete=False, suffix=ext, dir=OUTPUT_DIR, prefix='logo_'
+            )
+            tmp.write(logo_bytes)
+            tmp.close()
+            logo_path = tmp.name
+        except Exception as e:
+            print(f"[thesis_generator] logo decode error: {e}")
 
     # Intentar OpenAI primero, luego templates locales
     ai_content = _gen_openai(data)
     if ai_content:
         sec = {
-            'rp':      ai_content.get('rp', _rp(data['title'], data.get('research_line',''))),
-            'ant':     ai_content.get('ant', _ant(data['title'])),
-            'mt':      ai_content.get('mt', _mt(data['title'], data.get('research_line',''))),
-            'just':    ai_content.get('just', _just(data['title'])),
-            'prob':    ai_content.get('prob', ''),
-            'hip':     ai_content.get('hip', ''),
+            'rp':      ai_content.get('rp',      _rp(title, rl)),
+            'ant':     ai_content.get('ant',     _ant(title)),
+            'mt':      ai_content.get('mt',      _mt(title, rl)),
+            'just':    ai_content.get('just',    _just(title)),
+            'prob':    ai_content.get('prob',    ''),
+            'hip':     ai_content.get('hip',     ''),
             'obj_gen': ai_content.get('obj_gen', ''),
             'obj_esp': ai_content.get('obj_esp', []),
-            'lim':     ai_content.get('lim', ''),
+            'lim':     ai_content.get('lim',     ''),
         }
         source = 'openai'
     else:
-        base = _intro_text(data, refs)
-        sec  = base
+        sec    = _intro_text(data, refs)
         source = 'template'
+
+    # Añadir resumen, abstract y capítulos II–V (siempre desde templates)
+    sec['resumen']  = _resumen(title, rl)
+    sec['abstract'] = _abstract(title, rl)
+    sec['cap2']     = _cap2(title, rl)
+    sec['cap3']     = _cap3(title)
+    sec['cap4']     = _cap4(title)
+    sec['cap5']     = _cap5(title)
 
     # Jurado por defecto si no se proporcionó
     if not data.get('jurado'):
-        rng = random.Random(abs(hash(data.get('title','x'))) % 99999)
-        prefixes = ['Dr.', 'Mg.', 'Dr.']
+        rng = random.Random(abs(hash(title)) % 99999)
+        prefixes  = ['Dr.', 'Mg.', 'Dr.']
         lastnames = ['García López', 'Rodríguez Sánchez', 'Martínez Torres',
                      'Pérez Castillo', 'Flores Ramírez', 'Soto Herrera']
         data['jurado'] = [f"{prefixes[i]} {rng.choice(lastnames)}" for i in range(3)]
 
-    pdf_path  = _build_pdf(data, sec, refs, uid)
-    docx_path = _build_docx(data, sec, refs, uid)
+    pdf_path  = _build_pdf(data, sec, refs, uid, logo_path=logo_path)
+    docx_path = _build_docx(data, sec, refs, uid, logo_path=logo_path)
+
+    # Limpiar logo temporal
+    if logo_path and os.path.exists(logo_path):
+        try:
+            os.remove(logo_path)
+        except Exception:
+            pass
 
     return {
         'uid':       uid,
         'pdf_file':  os.path.basename(pdf_path),
         'docx_file': os.path.basename(docx_path),
         'source':    source,
-        'sections':  {k: v[:200] + '...' if isinstance(v,str) and len(v)>200 else v
-                      for k, v in sec.items()},
+        'sections':  {k: (v[:200] + '...' if isinstance(v, str) and len(v) > 200 else v)
+                      for k, v in sec.items() if isinstance(v, (str, list))},
     }

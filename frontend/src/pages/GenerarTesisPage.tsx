@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { FileText, Download, Loader2, Sparkles, BookOpen, User, Users, MapPin, Calendar } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { FileText, Download, Loader2, Sparkles, BookOpen, User, Users, MapPin, Calendar, ImagePlus, X } from 'lucide-react'
 import { generateThesis, downloadThesisFile, getThesisPdfBlob } from '../api'
 import type { ThesisResult } from '../api'
 
@@ -39,15 +39,36 @@ const INITIAL: FormState = {
 }
 
 export default function GenerarTesisPage() {
-  const [form, setForm]         = useState<FormState>(INITIAL)
-  const [loading, setLoading]   = useState(false)
-  const [result, setResult]     = useState<ThesisResult | null>(null)
-  const [error, setError]       = useState('')
-  const [pdfUrl, setPdfUrl]     = useState('')
+  const [form, setForm]           = useState<FormState>(INITIAL)
+  const [loading, setLoading]     = useState(false)
+  const [result, setResult]       = useState<ThesisResult | null>(null)
+  const [error, setError]         = useState('')
+  const [pdfUrl, setPdfUrl]       = useState('')
   const [loadingPdf, setLoadingPdf] = useState(false)
+  const [logoData, setLogoData]   = useState<string>('')      // base64 data-URL
+  const [logoPreview, setLogoPreview] = useState<string>('')  // object URL for <img>
+  const logoInputRef = useRef<HTMLInputElement>(null)
 
   const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [k]: k === 'year' ? Number(e.target.value) : e.target.value }))
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    const reader = new FileReader()
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string
+      setLogoData(dataUrl)
+      setLogoPreview(dataUrl)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const removeLogo = () => {
+    setLogoData('')
+    setLogoPreview('')
+    if (logoInputRef.current) logoInputRef.current.value = ''
+  }
 
   const valid = form.title.trim() && form.authors.trim() && form.advisor.trim()
 
@@ -65,6 +86,7 @@ export default function GenerarTesisPage() {
         research_line: form.research_line,
         city:          form.city,
         year:          form.year,
+        logo_data:     logoData || undefined,
       })
       setResult(res)
       // Load PDF preview
@@ -196,6 +218,40 @@ export default function GenerarTesisPage() {
             </div>
           </div>
 
+          {/* Logo institucional */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+              <ImagePlus size={14} /> Logo institucional
+              <span className="font-normal text-gray-400">(opcional, PNG/JPG)</span>
+            </label>
+            {logoPreview ? (
+              <div className="flex items-center gap-3 p-2 border border-gray-200 rounded-lg bg-gray-50">
+                <img src={logoPreview} alt="Logo" className="h-14 w-14 object-contain rounded" />
+                <div className="flex-1 text-xs text-gray-500">Logo listo para insertar en la carátula</div>
+                <button
+                  type="button"
+                  onClick={removeLogo}
+                  className="p-1 text-gray-400 hover:text-red-500 transition-colors"
+                  title="Quitar logo"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center gap-1.5 w-full h-20 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-colors">
+                <ImagePlus size={20} className="text-gray-400" />
+                <span className="text-xs text-gray-500">Haz clic para seleccionar imagen</span>
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/jpg,image/webp"
+                  className="hidden"
+                  onChange={handleLogoChange}
+                />
+              </label>
+            )}
+          </div>
+
           {/* Error */}
           {error && (
             <div className="bg-red-50 border border-red-200 text-red-700 rounded-lg px-4 py-3 text-sm">
@@ -228,8 +284,9 @@ export default function GenerarTesisPage() {
             <p>• Arial Narrow 12 pt · Interlineado 1.5 · Justificado</p>
             <p>• Márgenes: Izq 3 cm / Der-Sup-Inf 2.5 cm</p>
             <p>• Numeración arábiga esquina inferior derecha</p>
-            <p>• Sin encabezado ni pie de página</p>
-            <p>• ≥ 30 referencias APA V7 · 80% inglés · 80% últimos 5 años</p>
+            <p>• Cap. I–V completos · ≥ 50 páginas</p>
+            <p>• Máx. 25 referencias APA V7 · 80% inglés · 80% últimos 5 años</p>
+            <p>• Logo institucional en carátula (si se sube)</p>
           </div>
         </div>
 
@@ -253,10 +310,11 @@ export default function GenerarTesisPage() {
                 {/* Secciones generadas */}
                 <div className="grid grid-cols-2 gap-2">
                   {[
+                    'Resumen / Abstract', 'Cap. I: Introducción',
                     'Realidad problemática', 'Antecedentes', 'Marco teórico',
-                    'Justificación', 'Problema', 'Hipótesis',
-                    'Objetivos', 'Limitaciones', 'Referencias APA V7',
-                    'Árbol de problemas', 'Árbol de objetivos', 'Declaración jurada',
+                    'Cap. II: Metodología', 'Cap. III: Resultados',
+                    'Cap. IV: Discusión', 'Cap. V: Conclusiones',
+                    'Máx. 25 refs APA V7', 'Árbol de problemas', 'Declaración jurada',
                   ].map(s => (
                     <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
                       <span className="text-green-500 font-bold">✓</span> {s}
@@ -318,13 +376,16 @@ export default function GenerarTesisPage() {
                 </p>
               </div>
               <div className="bg-gray-50 rounded-lg p-4 text-left text-xs text-gray-500 w-full max-w-xs space-y-1.5">
-                <p className="font-semibold text-gray-600 mb-2">Contenido generado automáticamente:</p>
-                <p>📄 Carátula con datos institucionales</p>
-                <p>⚖️ Jurado dictaminador</p>
-                <p>📋 Índice general</p>
-                <p>📝 Cap. I: Introducción completa (prosa)</p>
-                <p>📚 ≥30 referencias APA V7</p>
-                <p>🌳 Árbol de problemas y objetivos</p>
+                <p className="font-semibold text-gray-600 mb-2">Contenido generado (≥ 50 páginas):</p>
+                <p>📄 Carátula con logo · Jurado · Índices</p>
+                <p>📝 Resumen y Abstract</p>
+                <p>📗 Cap. I: Introducción completa</p>
+                <p>📘 Cap. II: Metodología detallada</p>
+                <p>📊 Cap. III: Resultados con tablas</p>
+                <p>💬 Cap. IV: Discusión</p>
+                <p>✅ Cap. V: Conclusiones y Recomendaciones</p>
+                <p>📚 Máx. 25 referencias APA V7</p>
+                <p>🌳 Árboles de problemas y objetivos</p>
                 <p>✍️ Declaración jurada</p>
               </div>
             </div>

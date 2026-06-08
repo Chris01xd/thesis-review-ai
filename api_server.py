@@ -882,6 +882,7 @@ class ThesisRequest(BaseModel):
     city:          str  = "Trujillo"
     year:          int  = 2026
     jurado:        list[str] = []
+    logo_data:     Optional[str] = None   # base64 data-URL of logo image
 
 
 @app.post("/api/generar_tesis", summary="Generar tesis completa (PDF + DOCX)", tags=["Tesis"])
@@ -903,6 +904,7 @@ def generar_tesis(req: ThesisRequest):
             'city':          req.city,
             'year':          req.year,
             'jurado':        req.jurado or [],
+            'logo_data':     req.logo_data,
         })
         return result
     except Exception as e:

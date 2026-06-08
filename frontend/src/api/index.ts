@@ -152,6 +152,7 @@ export interface ThesisRequest {
   city: string
   year: number
   jurado?: string[]
+  logo_data?: string   // base64 data-URL of institution logo
 }
 export interface ThesisResult {
   uid: string
