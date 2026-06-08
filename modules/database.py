@@ -10,6 +10,9 @@ DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
 DB_PATH = os.getenv("DB_PATH", os.path.join("data", "thesis_review.db"))
 USE_PG = bool(DATABASE_URL)
 
+# Flag de fallback: se activa si PostgreSQL falla al primer intento
+_PG_FAILED = False
+
 
 def now():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -26,28 +29,36 @@ def check_password(password: str, hashed: str) -> bool:
         return False
 
 
+def _sqlite_connect():
+    import sqlite3
+    os.makedirs("data", exist_ok=True)
+    conn = sqlite3.connect(DB_PATH, check_same_thread=False)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
 def connect():
-    if USE_PG:
-        import psycopg2
-        import psycopg2.extras
+    global _PG_FAILED
 
-        url = DATABASE_URL
-        if url.startswith("postgres://"):
-            url = url.replace("postgres://", "postgresql://", 1)
+    if USE_PG and not _PG_FAILED:
+        try:
+            import psycopg2
+            import psycopg2.extras
+            url = DATABASE_URL
+            if url.startswith("postgres://"):
+                url = url.replace("postgres://", "postgresql://", 1)
+            conn = psycopg2.connect(
+                url,
+                cursor_factory=psycopg2.extras.RealDictCursor,
+                connect_timeout=5,
+            )
+            conn.autocommit = False
+            return conn
+        except Exception as e:
+            print(f"[database] PostgreSQL no disponible ({e}), usando SQLite como fallback.")
+            _PG_FAILED = True
 
-        conn = psycopg2.connect(
-            url,
-            cursor_factory=psycopg2.extras.RealDictCursor
-        )
-        conn.autocommit = False
-        return conn
-
-    else:
-        import sqlite3
-        os.makedirs("data", exist_ok=True)
-        conn = sqlite3.connect(DB_PATH, check_same_thread=False)
-        conn.row_factory = sqlite3.Row
-        return conn
+    return _sqlite_connect()
 
 
 def _to_pg(sql: str) -> str:
