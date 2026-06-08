@@ -27,12 +27,22 @@ app = FastAPI(
     contact={"name": "ThesisReview AI", "email": "admin@tesis.edu"},
 )
 
+_FRONTEND_ORIGINS = [
+    "https://thesisreview-api.onrender.com",   # backend (Swagger UI)
+    "http://localhost:5173",                    # dev local
+    "http://localhost:3000",
+]
+# Acepta cualquier *.onrender.com para el frontend static site
+# y cualquier origen en desarrollo
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
-    allow_credentials=False,   # no se usan cookies — el token va en Authorization header
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type", "Accept",
+                   "X-Requested-With", "Origin"],
+    expose_headers=["*"],
+    max_age=600,
 )
 
 
