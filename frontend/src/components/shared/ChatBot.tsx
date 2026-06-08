@@ -101,12 +101,13 @@ export function ChatBot() {
     } catch (err: any) {
       const status  = err?.response?.status
       const detail  = err?.response?.data?.detail || err?.message || 'sin detalle'
+      const apiBase = import.meta.env.VITE_API_URL || '(vacío — misma origen)'
       console.error('[ChatBot] error /api/chat →', status, detail, err)
       const msg = status === 404
-        ? 'Endpoint no encontrado (404). El backend puede estar actualizándose, intenta en un momento.'
+        ? `Endpoint no encontrado (404). Backend: ${apiBase}`
         : status >= 500
           ? `Error del servidor (${status}): ${detail}`
-          : `No se pudo conectar con el servidor. Verifica tu conexión.`
+          : `No se pudo conectar. URL backend: ${apiBase} | Error: ${detail}`
       setMessages([...history, { role: 'assistant', content: msg }])
     } finally {
       setLoading(false)
