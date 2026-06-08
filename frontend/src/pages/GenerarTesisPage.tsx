@@ -4,18 +4,11 @@ import { generateThesis, downloadThesisFile, getThesisPdfBlob } from '../api'
 import type { ThesisResult } from '../api'
 
 const RESEARCH_LINES = [
-  'Gestión de Sistemas de Información',
-  'Inteligencia Artificial y Machine Learning',
-  'Seguridad Informática y Ciberseguridad',
-  'Desarrollo de Software',
-  'Redes y Comunicaciones',
-  'Ingeniería de Software y Metodologías Ágiles',
-  'Big Data y Ciencia de Datos',
-  'Internet de las Cosas (IoT)',
-  'Automatización y Robótica',
-  'Gestión de Tecnologías de Información',
-  'Computación en la Nube y DevOps',
-  'Sistemas Embebidos y Microcontroladores',
+  'Gestión de Gobierno y Servicios de TIC',
+  'Gestión de Proyectos de TIC',
+  'Gestión de Desarrollo de Software',
+  'Gestión de Infraestructura y Comunicaciones',
+  'Gestión de la Seguridad de la Información',
 ]
 
 const CITIES = ['Trujillo', 'Lima', 'Arequipa', 'Chiclayo', 'Piura', 'Cusco', 'Iquitos', 'Huancayo']
