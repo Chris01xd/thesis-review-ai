@@ -1051,11 +1051,26 @@ class ChatRequest(BaseModel):
 
 def _get_system_stats() -> dict:
     def q(sql):
-        rows = query(sql)
-        return rows[0][list(rows[0].keys())[0]] if rows else 0
+        try:
+            rows = query(sql)
+            if not rows:
+                return 0
+            val = list(rows[0].values())[0]
+            return val if val is not None else 0
+        except Exception:
+            return 0
 
-    avg_row = query("SELECT ROUND(AVG(overall_score),1) AS n FROM ai_analyses")
-    avg = avg_row[0]["n"] if avg_row and avg_row[0]["n"] is not None else "N/A"
+    # ROUND(AVG()::numeric, 1) es compatible con PostgreSQL y SQLite
+    try:
+        from modules.database import USE_PG
+        avg_sql = ("SELECT ROUND(AVG(overall_score)::numeric, 1) AS n FROM ai_analyses"
+                   if USE_PG else
+                   "SELECT ROUND(AVG(overall_score), 1) AS n FROM ai_analyses")
+        avg_row = query(avg_sql)
+        avg = str(avg_row[0]["n"]) if avg_row and avg_row[0]["n"] is not None else "N/A"
+    except Exception:
+        avg = "N/A"
+
     return {
         "total_advances":  q("SELECT COUNT(*) AS n FROM advances"),
         "total_analyses":  q("SELECT COUNT(*) AS n FROM ai_analyses"),
@@ -1126,44 +1141,50 @@ def _fallback_chat(message: str, stats: dict) -> str:
 @app.post("/api/chat", summary="Chatbot inteligente del sistema", tags=["Chatbot"])
 def chat_endpoint(req: ChatRequest):
     """Responde preguntas sobre el sistema usando estadísticas en tiempo real y GPT (fallback keywords)."""
-    stats = _get_system_stats()
-    api_key = os.getenv('OPENAI_API_KEY', '')
+    try:
+        stats = _get_system_stats()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error obteniendo estadísticas: {e}")
 
-    if api_key:
-        try:
-            import openai
-            client = openai.OpenAI(api_key=api_key)
-            system_prompt = (
-                "Eres el asistente virtual de ThesisReview AI, plataforma de revisión de avances de tesis "
-                "de la Universidad Nacional de Trujillo. Responde en español, de forma amigable y concisa "
-                "(máximo 120 palabras). Usa **negrita** para datos importantes.\n\n"
-                f"ESTADÍSTICAS ACTUALES:\n"
-                f"- Tesis registradas: {stats['total_advances']}\n"
-                f"- Análisis IA: {stats['total_analyses']}\n"
-                f"- Revisiones: {stats['total_reviews']} ({stats['pending_reviews']} pendientes)\n"
-                f"- Usuarios: {stats['total_users']} ({stats['total_students']} estudiantes, {stats['total_advisors']} asesores)\n"
-                f"- Programas: {stats['total_programs']}\n"
-                f"- Trabajos en lote: {stats['completed_jobs']}/{stats['total_jobs']} completados\n"
-                f"- Puntaje IA promedio: {stats['avg_score']}/100\n\n"
-                "FUNCIONES: revisión IA, detector IA, similitud académica, generador de tesis PDF+Word, email, app móvil.\n"
-                "Solo responde sobre ThesisReview AI."
-            )
-            messages = [{"role": "system", "content": system_prompt}]
-            for h in req.history[-6:]:
-                if h.get("role") in ("user","assistant") and h.get("content"):
-                    messages.append({"role": h["role"], "content": h["content"]})
-            messages.append({"role": "user", "content": req.message})
-            resp = client.chat.completions.create(
-                model=os.getenv('OPENAI_MODEL','gpt-4o-mini'),
-                messages=messages,
-                temperature=0.5,
-                max_tokens=300,
-            )
-            answer = resp.choices[0].message.content.strip()
-        except Exception as e:
-            print(f"[chat] OpenAI error: {e}")
+    try:
+        api_key = os.getenv('OPENAI_API_KEY', '')
+        if api_key:
+            try:
+                import openai
+                oai = openai.OpenAI(api_key=api_key)
+                system_prompt = (
+                    "Eres el asistente virtual de ThesisReview AI, plataforma de revisión de avances de tesis "
+                    "de la Universidad Nacional de Trujillo. Responde en español, de forma amigable y concisa "
+                    "(máximo 120 palabras). Usa **negrita** para datos importantes.\n\n"
+                    f"ESTADÍSTICAS ACTUALES:\n"
+                    f"- Tesis registradas: {stats['total_advances']}\n"
+                    f"- Análisis IA: {stats['total_analyses']}\n"
+                    f"- Revisiones: {stats['total_reviews']} ({stats['pending_reviews']} pendientes)\n"
+                    f"- Usuarios: {stats['total_users']} ({stats['total_students']} estudiantes, {stats['total_advisors']} asesores)\n"
+                    f"- Programas: {stats['total_programs']}\n"
+                    f"- Trabajos en lote: {stats['completed_jobs']}/{stats['total_jobs']} completados\n"
+                    f"- Puntaje IA promedio: {stats['avg_score']}/100\n\n"
+                    "FUNCIONES: revisión IA, detector IA, similitud académica, generador de tesis PDF+Word, email, app móvil.\n"
+                    "Solo responde sobre ThesisReview AI."
+                )
+                messages = [{"role": "system", "content": system_prompt}]
+                for h in req.history[-6:]:
+                    if h.get("role") in ("user", "assistant") and h.get("content"):
+                        messages.append({"role": h["role"], "content": h["content"]})
+                messages.append({"role": "user", "content": req.message})
+                resp = oai.chat.completions.create(
+                    model=os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                    messages=messages,
+                    temperature=0.5,
+                    max_tokens=300,
+                )
+                answer = resp.choices[0].message.content.strip()
+            except Exception as e:
+                print(f"[chat] OpenAI error: {e}")
+                answer = _fallback_chat(req.message, stats)
+        else:
             answer = _fallback_chat(req.message, stats)
-    else:
+    except Exception as e:
         answer = _fallback_chat(req.message, stats)
 
     return {"answer": answer, "stats": stats}
