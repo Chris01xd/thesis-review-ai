@@ -1,6 +1,6 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { FileText, Download, Loader2, Sparkles, BookOpen, User, Users, MapPin, Calendar, ImagePlus, X } from 'lucide-react'
-import { generateThesis, downloadThesisFile, getThesisPdfBlob } from '../api'
+import { generateThesis, downloadThesisFile, getThesisPdfBlob, getUsers } from '../api'
 import type { ThesisResult } from '../api'
 
 const RESEARCH_LINES = [
@@ -41,6 +41,13 @@ export default function GenerarTesisPage() {
   const [logoData, setLogoData]   = useState<string>('')      // base64 data-URL
   const [logoPreview, setLogoPreview] = useState<string>('')  // object URL for <img>
   const logoInputRef = useRef<HTMLInputElement>(null)
+  const [advisors, setAdvisors]   = useState<{ id: number; name: string }[]>([])
+
+  useEffect(() => {
+    getUsers('ADVISOR')
+      .then(users => setAdvisors(users.map(u => ({ id: u.id, name: u.name }))))
+      .catch(() => {})
+  }, [])
 
   const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [k]: k === 'year' ? Number(e.target.value) : e.target.value }))
@@ -160,13 +167,26 @@ export default function GenerarTesisPage() {
             <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
               <User size={14} /> Asesor *
             </label>
-            <input
-              type="text"
-              value={form.advisor}
-              onChange={set('advisor')}
-              placeholder="Ej: Dr. Carlos Alberto García Mendoza"
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            {advisors.length > 0 ? (
+              <select
+                value={form.advisor}
+                onChange={set('advisor')}
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              >
+                <option value="">— Selecciona un asesor —</option>
+                {advisors.map(a => (
+                  <option key={a.id} value={a.name}>{a.name}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type="text"
+                value={form.advisor}
+                onChange={set('advisor')}
+                placeholder="Ej: Dr. Carlos Alberto García Mendoza"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            )}
           </div>
 
           {/* Línea de investigación */}
