@@ -2466,93 +2466,130 @@ def _content_proyecto_tesis(title: str, rl: str) -> dict:
     return sec
 
 
-# ── Contenido: Artículo de Investigación ──────────────────────────────────────
+# ── Contenido: Artículo de Investigación (formato RCSI) ───────────────────────
 
 def _content_articulo(title: str, rl: str) -> dict:
-    """Genera el contenido para un Artículo de Investigación."""
+    """Genera contenido para un Artículo de Investigación en formato RCSI."""
     kw = " ".join(title.split()[:5])
-    year = datetime.now().year
+    words = [w.lower() for w in title.split() if len(w) > 4]
 
     abstract_es = (
-        f"El presente artículo analiza el impacto de {kw} en el contexto peruano, "
-        f"abordando la problemática desde una perspectiva cuantitativa. Se aplicó un diseño "
-        f"cuasi-experimental con pre y post test a una muestra de 123 participantes seleccionados "
-        f"mediante muestreo aleatorio estratificado. Los resultados evidencian mejoras "
-        f"estadísticamente significativas (p < 0.05) en los indicadores clave tras la implementación "
-        f"de la propuesta. Se concluye que {kw} contribuye de manera efectiva a la optimización "
-        f"de los procesos estudiados. Se recomienda ampliar el estudio a contextos institucionales "
-        f"similares para validar la generalización de los hallazgos."
+        f"Se analizó el impacto de {kw} en el contexto peruano desde una perspectiva cuantitativa. "
+        f"Se aplicó un diseño cuasi-experimental con pre y post test a una muestra de 123 participantes "
+        f"seleccionados mediante muestreo aleatorio estratificado (95% confianza, error 5%). "
+        f"El instrumento fue validado por juicio de expertos (CVC = 0.87) y presentó alta confiabilidad "
+        f"(α de Cronbach = 0.912). Los resultados evidenciaron mejoras estadísticamente significativas "
+        f"(t(122) = 8.47, p < 0.001) en los indicadores evaluados: el tiempo de procesamiento se redujo "
+        f"en 58.6%, la tasa de error disminuyó en 75% y la satisfacción del usuario aumentó de 2.8 a "
+        f"4.3 puntos (escala 1-5). Se concluyó que {kw} optimiza significativamente los procesos "
+        f"estudiados con un tamaño de efecto grande (d de Cohen = 1.52). Se recomienda ampliar el "
+        f"estudio a contextos institucionales similares para validar la generalización de los hallazgos."
     )
     abstract_en = (
-        f"This article analyzes the impact of {kw} in the Peruvian context, addressing the "
-        f"problematic from a quantitative perspective. A quasi-experimental design with pre and "
-        f"post-test was applied to a sample of 123 participants selected through stratified random "
-        f"sampling. Results show statistically significant improvements (p < 0.05) in key indicators "
-        f"after the implementation of the proposal. It is concluded that {kw} effectively contributes "
-        f"to the optimization of the studied processes. Further research is recommended to validate "
-        f"generalization across similar institutional contexts."
+        f"The impact of {kw} in the Peruvian context was analyzed from a quantitative perspective. "
+        f"A quasi-experimental design with pre and post-test was applied to a sample of 123 participants "
+        f"selected through stratified random sampling (95% confidence, 5% error). The instrument was "
+        f"validated by expert judgment (CVC = 0.87) and showed high reliability (Cronbach's α = 0.912). "
+        f"Results showed statistically significant improvements (t(122) = 8.47, p < 0.001) in evaluated "
+        f"indicators: processing time was reduced by 58.6%, error rate decreased by 75%, and user "
+        f"satisfaction increased from 2.8 to 4.3 points (1-5 scale). It was concluded that {kw} "
+        f"significantly optimizes the studied processes with a large effect size (Cohen's d = 1.52). "
+        f"Further research is recommended to validate generalization across similar institutional contexts."
     )
+
+    sorted_kws = sorted(set(words[:5]))
+    palabras_clave = ", ".join(sorted_kws[:5])
+    keywords_en   = palabras_clave.replace("sistema", "system").replace("gestión", "management")
 
     introduction = (
         f"En la actualidad, {kw} representa uno de los ejes centrales del desarrollo organizacional "
-        f"y tecnológico en América Latina. Diversos organismos internacionales, como la UNESCO y el "
-        f"Banco Mundial, han señalado la necesidad de adoptar estrategias basadas en evidencia para "
-        f"mejorar los procesos vinculados a {kw}. En el contexto peruano, la situación no es diferente: "
-        f"múltiples estudios evidencian brechas significativas en la implementación de soluciones "
-        f"tecnológicas que optimicen {kw}. El presente artículo tiene como objetivo evaluar el efecto "
-        f"de una intervención sistemática sobre los indicadores de desempeño asociados a {kw}, "
-        f"contribuyendo así al cuerpo de conocimiento existente en la materia."
+        f"y tecnológico en América Latina (UNESCO, 2023). Diversos organismos internacionales han "
+        f"señalado la necesidad urgente de adoptar estrategias basadas en evidencia para mejorar los "
+        f"procesos vinculados a {kw} (Banco Mundial, 2022). En el contexto peruano, múltiples estudios "
+        f"evidencian brechas significativas en la implementación de soluciones que optimicen {kw} "
+        f"(García et al., 2023; López & Martínez, 2022). A pesar de los avances tecnológicos, la "
+        f"mayoría de organizaciones del sector aún operan con procesos manuales e ineficientes, lo que "
+        f"genera pérdidas económicas y operativas (Rodríguez, 2024). El vacío científico identificado "
+        f"radica en la escasa evidencia sobre intervenciones sistematizadas para {kw} en el contexto "
+        f"peruano, particularmente en instituciones del sector público y privado de la región La "
+        f"Libertad. El presente artículo tiene como objetivo evaluar el efecto de una intervención "
+        f"sistemática sobre los indicadores de desempeño asociados a {kw}, contribuyendo al cuerpo "
+        f"de conocimiento existente en la línea de investigación de {rl}."
     )
 
     methodology = (
-        f"Se empleó un diseño cuasi-experimental con un grupo de control y un grupo experimental. "
-        f"La muestra estuvo conformada por 123 participantes (n = 123) seleccionados mediante "
-        f"muestreo aleatorio estratificado con un nivel de confianza del 95% y margen de error del 5%. "
-        f"El instrumento de recolección fue un cuestionario estructurado de 25 ítems (escala Likert 1-5), "
-        f"validado mediante juicio de expertos (CVC = 0.87) y con alta confiabilidad (α = 0.912). "
-        f"El análisis estadístico incluyó pruebas de normalidad (Shapiro-Wilk), estadística descriptiva "
-        f"e inferencial (prueba t de Student para datos paramétricos y Wilcoxon para no paramétricos), "
-        f"procesados con SPSS v.26."
+        f"El estudio se desarrolló en instituciones del departamento de La Libertad, Perú, durante "
+        f"el período marzo-agosto {datetime.now().year}. Se empleó un diseño cuasi-experimental con "
+        f"preprueba y posprueba en un grupo experimental (GE) y un grupo control (GC). El tipo de "
+        f"investigación fue aplicada y el nivel explicativo-causal. La población estuvo conformada "
+        f"por 180 trabajadores del área de estudio y la muestra, calculada mediante muestreo aleatorio "
+        f"estratificado con 95% de confianza y 5% de margen de error, ascendió a 123 participantes. "
+        f"Las variables de estudio fueron: variable independiente ({kw.split()[0]}) y variable "
+        f"dependiente (indicadores de desempeño organizacional). El instrumento de recolección fue un "
+        f"cuestionario estructurado de 25 ítems en escala Likert (1-5), validado mediante juicio de "
+        f"expertos (CVC = 0.87; Hernández-Nieto, 2002) y con alta confiabilidad (α de Cronbach = 0.912). "
+        f"El análisis estadístico incluyó pruebas de normalidad Shapiro-Wilk, estadística descriptiva e "
+        f"inferencial (prueba t de Student para datos paramétricos, U de Mann-Whitney para no "
+        f"paramétricos) y cálculo del tamaño de efecto (d de Cohen), procesados con SPSS v.26."
     )
 
-    results = (
-        f"Los resultados del pre-test mostraron que el 68.3% de los participantes presentaban "
-        f"niveles insatisfactorios en los indicadores evaluados. Tras la implementación de la "
-        f"intervención relacionada con {kw}, el post-test reveló una mejora significativa: el 84.6% "
-        f"alcanzó niveles satisfactorios o superiores. La prueba t de Student arrojó un valor "
-        f"t(122) = 8.47, p < 0.001, IC 95% [12.3, 19.8], lo que indica diferencias estadísticamente "
-        f"significativas entre el pre y post test. El tamaño del efecto (d de Cohen = 1.52) "
-        f"refleja un impacto grande de la intervención propuesta."
-    )
-
-    discussion = (
-        f"Los hallazgos obtenidos son consistentes con lo reportado por investigaciones previas "
-        f"sobre {kw}. En línea con los postulados de la Teoría de Aceptación Tecnológica (TAM), "
-        f"los participantes mostraron alta percepción de utilidad y facilidad de uso, lo que facilitó "
-        f"la adopción de las estrategias propuestas. Estos resultados contrastan con estudios de "
-        f"contextos similares que reportan tasas de mejora menores, posiblemente por diferencias "
-        f"metodológicas o en las características de la muestra. Las implicaciones prácticas sugieren "
-        f"que la réplica de esta intervención en instituciones similares podría generar beneficios "
-        f"comparables, siempre que se garanticen las condiciones de capacitación y seguimiento."
+    resultados_discusion = (
+        f"Los resultados del pre-test mostraron que el 68.3% de los participantes del GE presentaban "
+        f"niveles insatisfactorios en los indicadores evaluados (M = 2.3, DE = 0.78). Tras la "
+        f"implementación de la intervención relacionada con {kw}, el post-test reveló una mejora "
+        f"significativa: el 84.6% alcanzó niveles satisfactorios o superiores (M = 4.1, DE = 0.52). "
+        f"La prueba t de Student arrojó t(122) = 8.47, p < 0.001, IC 95% [12.3, 19.8], lo que "
+        f"confirma diferencias estadísticamente significativas. El tamaño del efecto (d de Cohen = 1.52) "
+        f"refleja un impacto grande de la intervención propuesta. En el GC no se registraron mejoras "
+        f"significativas (p = 0.412). Estos hallazgos son consistentes con lo reportado por García et al. "
+        f"(2023) y López & Martínez (2022), quienes documentaron mejoras similares en contextos "
+        f"equiparables. En línea con los postulados de la Teoría de Aceptación Tecnológica (Davis, 1989), "
+        f"los participantes mostraron alta percepción de utilidad (M = 4.2) y facilidad de uso (M = 4.0), "
+        f"lo que facilitó la adopción de las estrategias propuestas. Estos resultados superan los "
+        f"reportados por estudios previos en la región (Rodríguez, 2024), posiblemente por la mayor "
+        f"sistematización del proceso de capacitación y acompañamiento implementado. Las implicaciones "
+        f"prácticas sugieren que la réplica de esta intervención en instituciones similares podría "
+        f"generar beneficios comparables, garantizando condiciones de capacitación y seguimiento."
     )
 
     conclusions = (
-        f"Se concluye que la implementación de la propuesta relacionada con {kw} generó mejoras "
-        f"estadísticamente significativas (p < 0.001) en los indicadores de desempeño evaluados, "
-        f"con un tamaño de efecto grande (d = 1.52). La intervención demostró ser viable, replicable "
-        f"y pertinente para el contexto peruano. Se recomienda realizar estudios longitudinales para "
-        f"evaluar la sostenibilidad de los efectos a largo plazo, así como ampliar la muestra a "
-        f"contextos geográficos e institucionales distintos para fortalecer la validez externa del estudio."
+        f"La implementación de la propuesta relacionada con {kw} generó mejoras estadísticamente "
+        f"significativas (p < 0.001, d = 1.52) en los indicadores de desempeño evaluados. La "
+        f"intervención demostró ser viable, replicable y pertinente para el contexto institucional "
+        f"peruano. Se recomienda realizar estudios longitudinales para evaluar la sostenibilidad de los "
+        f"efectos a largo plazo, ampliar la muestra a diferentes contextos geográficos e institucionales "
+        f"para fortalecer la validez externa, e incorporar métricas complementarias que permitan capturar "
+        f"dimensiones no evaluadas en el presente estudio. Los beneficios de estos resultados impactan "
+        f"directamente en la eficiencia organizacional y en la calidad del servicio ofrecido a los "
+        f"usuarios finales."
     )
 
     return {
-        'resumen':      abstract_es,
-        'abstract':     abstract_en,
-        'introduction': introduction,
-        'methodology':  methodology,
-        'results':      results,
-        'discussion':   discussion,
-        'conclusions':  conclusions,
+        'resumen':              abstract_es,
+        'abstract':             abstract_en,
+        'palabras_clave':       palabras_clave,
+        'keywords':             keywords_en,
+        'introduction':         introduction,
+        'methodology':          methodology,
+        'resultados_discusion': resultados_discusion,
+        'results':              resultados_discusion,
+        'discussion':           resultados_discusion,
+        'conclusions':          conclusions,
+        'agradecimientos':      (
+            f"Los autores expresan su agradecimiento a las instituciones y colaboradores que "
+            f"participaron en el proceso de recolección de datos, así como a los expertos que "
+            f"validaron los instrumentos empleados en la investigación."
+        ),
+        'conflicto_intereses':  (
+            "No existe ningún tipo de conflicto de interés relacionado con la materia del trabajo."
+        ),
+        'fuente_financiamiento': (
+            "Los autores no recibieron ningún patrocinio para llevar a cabo este estudio."
+        ),
+        'disponibilidad_datos': (
+            "Los datos que respaldan los resultados de este estudio están disponibles bajo "
+            "solicitud razonada al autor de correspondencia. No aplica repositorio público."
+        ),
     }
 
 
@@ -3002,58 +3039,101 @@ def _build_pdf_articulo(data: dict, sec: dict, refs: list, uid: str, logo_path: 
     if isinstance(authors, str):
         authors = [a.strip() for a in authors.split(',')]
 
-    # Encabezado del artículo
-    sp(20)
+    city = data.get('city', 'Trujillo')
+    year = data.get('year', datetime.now().year)
+
+    # ── Encabezado RCSI ──────────────────────────────────────────────────────
+    sp(10)
     p(data['title'], 'h1')
+    sp(4)
+    # English title (italic approximation via normal style)
+    p(f"[English title: {data['title']}]", 'c')
     sp(10)
-    p(' · '.join(authors), 'c')
-    p(f"Universidad Nacional de Trujillo · {data.get('city', 'Trujillo')}", 'c')
-    sp(6)
-    p(f"Correo: investigacion@unitru.edu.pe · Año: {data.get('year', datetime.now().year)}", 'c')
-    story.append(HRFlowable(width='100%', thickness=1, color=colors.HexColor('#1e3a5f')))
+    for i, a in enumerate(authors, 1):
+        p(f"{a} {i}, ORCID: 0000-0000-0000-000{i}, {a.lower().replace(' ','.')}@unitru.edu.pe", 'c')
+    sp(4)
+    for i, a in enumerate(authors, 1):
+        p(f"{i} Universidad Nacional de Trujillo, {city}, Perú", 'c')
+    sp(4)
+    p(f"Autor de correspondencia: {authors[0].lower().replace(' ','.')}@unitru.edu.pe", 'c')
+    story.append(HRFlowable(width='100%', thickness=1.5, color=colors.HexColor('#1e3a5f')))
     sp(10)
 
-    # Resumen
-    p("Resumen", 'h2')
-    p(sec.get('resumen', ''), 'n')
+    # ── Resumen ───────────────────────────────────────────────────────────────
+    p("<b>Resumen:</b> " + sec.get('resumen', ''), 'n')
     sp(6)
-    kw_list = ' '.join(data['title'].split()[:5]).lower()
-    p(f"<b>Palabras clave:</b> {kw_list}, investigación cuantitativa, metodología aplicada.", 'n')
-    sp(12)
+    pk = sec.get('palabras_clave', ', '.join(sorted(data['title'].lower().split()[:5])))
+    p(f"<b>Palabras clave:</b> {pk}", 'n')
+    sp(10)
     story.append(HRFlowable(width='100%', thickness=0.5, color=colors.HexColor('#c0c8d8')))
-    sp(12)
+    sp(10)
 
-    # Abstract
-    p("Abstract", 'h2')
-    p(sec.get('abstract', ''), 'n')
+    # ── Abstract ──────────────────────────────────────────────────────────────
+    p("<b>Abstract:</b> " + sec.get('abstract', ''), 'n')
     sp(6)
-    p(f"<b>Keywords:</b> {kw_list}, quantitative research, applied methodology.", 'n')
+    kw_en = sec.get('keywords', pk)
+    p(f"<b>Keywords:</b> {kw_en}", 'n')
     br()
 
-    # Secciones del artículo
-    sections_map = [
-        ("I. INTRODUCCIÓN", 'introduction'),
-        ("II. MATERIALES Y MÉTODOS", 'methodology'),
-        ("III. RESULTADOS", 'results'),
-        ("IV. DISCUSIÓN", 'discussion'),
-        ("V. CONCLUSIONES", 'conclusions'),
-    ]
-    for heading, key in sections_map:
+    # ── Secciones numeradas (RCSI: arábigos) ──────────────────────────────────
+    for heading, key in [
+        ("1    Introducción",          'introduction'),
+        ("2    Materiales y métodos",  'methodology'),
+        ("3    Resultados y discusión",'resultados_discusion'),
+    ]:
         p(heading, 'h1')
         sp(6)
-        content = sec.get(key, '')
-        if isinstance(content, (list, dict)):
-            p(str(content), 'n')
-        else:
-            p(str(content), 'n')
+        p(str(sec.get(key, '')), 'n')
         sp(12)
 
+    # ── Conclusiones (sin número) ─────────────────────────────────────────────
+    p("Conclusiones", 'h1')
+    sp(6)
+    p(str(sec.get('conclusions', '')), 'n')
+    sp(12)
+
+    # ── Agradecimientos ───────────────────────────────────────────────────────
+    p("Agradecimientos", 'h2')
+    sp(4)
+    p(str(sec.get('agradecimientos', '')), 'n')
+    sp(10)
+
+    # ── Conflicto de intereses ────────────────────────────────────────────────
+    p("Conflicto de intereses", 'h2')
+    sp(4)
+    p(str(sec.get('conflicto_intereses', 'No existe ningún tipo de conflicto de interés relacionado con la materia del trabajo.')), 'n')
+    sp(10)
+
+    # ── Fuente de financiamiento ──────────────────────────────────────────────
+    p("Fuente de financiamiento", 'h2')
+    sp(4)
+    p(str(sec.get('fuente_financiamiento', 'Los autores no recibieron ningún patrocinio para llevar a cabo este estudio.')), 'n')
+    sp(10)
+
+    # ── Contribución de autoría (CRediT) ──────────────────────────────────────
+    p("Contribución de autoría", 'h2')
+    sp(4)
+    credit_roles = [
+        "Conceptualización", "Curación de datos", "Análisis formal",
+        "Investigación", "Metodología", "Administración del proyecto",
+        "Recursos", "Software", "Supervisión", "Validación",
+        "Visualización", "Redacción - borrador original", "Redacción - revisión y edición",
+    ]
+    for i, role in enumerate(credit_roles):
+        author_name = authors[i % len(authors)]
+        p(f"{i+1}. {role}: {author_name}", 'n')
+    sp(10)
+
+    # ── Disponibilidad de datos ───────────────────────────────────────────────
+    p("Disponibilidad de datos depositados", 'h2')
+    sp(4)
+    p(str(sec.get('disponibilidad_datos', 'No aplica.')), 'n')
     br()
 
-    # Referencias
-    p("REFERENCIAS", 'h1')
+    # ── Referencias bibliográficas (APA 7, mínimo 30) ─────────────────────────
+    p("Referencias bibliográficas", 'h1')
     sp(10)
-    for ref in refs[:20]:
+    for ref in refs[:30]:
         p(ref, 'ref')
 
     doc.build(story)
@@ -3073,51 +3153,118 @@ def _build_docx_articulo(data: dict, sec: dict, refs: list, uid: str, logo_path:
     if isinstance(authors, str):
         authors = [a.strip() for a in authors.split(',')]
 
+    city = data.get('city', 'Trujillo')
+    year = data.get('year', datetime.now().year)
+
     def add_h(text, level=1):
-        h = doc.add_heading(text, level=level)
+        h = doc.add_heading(str(text), level=level)
         for run in h.runs:
+            run.font.name = 'Arial Narrow'
             run.font.color.rgb = RGBColor(0x1e, 0x3a, 0x5f)
 
-    def add_para(text, bold=False, align=WD_ALIGN_PARAGRAPH.JUSTIFY):
+    def add_para(text, bold=False, italic=False, align=WD_ALIGN_PARAGRAPH.JUSTIFY, sz=12):
         para = doc.add_paragraph()
-        para.paragraph_format.line_spacing = _Pt(20)
+        para.paragraph_format.line_spacing = _Pt(24)
+        para.paragraph_format.space_after  = _Pt(6)
         run = para.add_run(str(text))
-        run.font.name = 'Arial Narrow'
-        run.font.size = _Pt(12)
-        run.bold = bold
-        para.alignment = align
+        run.font.name   = 'Arial Narrow'
+        run.font.size   = _Pt(sz)
+        run.bold        = bold
+        run.italic      = italic
+        para.alignment  = align
 
+    def add_center(text, bold=False, sz=12):
+        add_para(text, bold=bold, align=WD_ALIGN_PARAGRAPH.CENTER, sz=sz)
+    # alias for backwards compat
+    add_center.__doc__ = 'center-aligned paragraph'
+
+    # ── Encabezado RCSI ──────────────────────────────────────────────────────
     add_h(data['title'], 1)
-    add_para(' · '.join(authors), align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_para(f"Universidad Nacional de Trujillo · {data.get('city','Trujillo')}", align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_para("")
+    add_center(f"[English title: {data['title']}]")
 
-    add_h("Resumen", 2)
-    add_para(sec.get('resumen', ''))
-    kw_list = ' '.join(data['title'].split()[:5]).lower()
-    add_para(f"Palabras clave: {kw_list}, investigación cuantitativa.")
+    for i, a in enumerate(authors, 1):
+        add_center(f"{a} {i}  |  ORCID: 0000-0000-0000-000{i}  |  {a.lower().replace(' ','.')}@unitru.edu.pe", sz=10)
+    for i, _ in enumerate(authors, 1):
+        add_center(f"{i} Universidad Nacional de Trujillo, {city}, Perú", sz=10)
+    add_center(f"Autor de correspondencia: {authors[0].lower().replace(' ','.')}@unitru.edu.pe", sz=10)
 
-    add_h("Abstract", 2)
-    add_para(sec.get('abstract', ''))
-    add_para(f"Keywords: {kw_list}, quantitative research.")
+    # ── Resumen ───────────────────────────────────────────────────────────────
+    doc.add_paragraph()
+    pk = sec.get('palabras_clave', ', '.join(sorted(data['title'].lower().split()[:5])))
+    res_para = doc.add_paragraph()
+    res_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    res_para.paragraph_format.space_after = _Pt(4)
+    r = res_para.add_run("Resumen: ")
+    r.bold = True; r.font.name = 'Arial Narrow'; r.font.size = _Pt(12)
+    r2 = res_para.add_run(str(sec.get('resumen', '')))
+    r2.font.name = 'Arial Narrow'; r2.font.size = _Pt(12)
 
+    kw_para = doc.add_paragraph()
+    kw_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    rk = kw_para.add_run("Palabras clave: ")
+    rk.bold = True; rk.font.name = 'Arial Narrow'; rk.font.size = _Pt(12)
+    rk2 = kw_para.add_run(pk)
+    rk2.font.name = 'Arial Narrow'; rk2.font.size = _Pt(12)
+
+    # ── Abstract ──────────────────────────────────────────────────────────────
+    doc.add_paragraph()
+    abs_para = doc.add_paragraph()
+    abs_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    ra = abs_para.add_run("Abstract: ")
+    ra.bold = True; ra.font.name = 'Arial Narrow'; ra.font.size = _Pt(12)
+    ra2 = abs_para.add_run(str(sec.get('abstract', '')))
+    ra2.font.name = 'Arial Narrow'; ra2.font.size = _Pt(12)
+
+    kw_en = sec.get('keywords', pk)
+    kw2_para = doc.add_paragraph()
+    kw2_para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+    rke = kw2_para.add_run("Keywords: ")
+    rke.bold = True; rke.font.name = 'Arial Narrow'; rke.font.size = _Pt(12)
+    rke2 = kw2_para.add_run(kw_en)
+    rke2.font.name = 'Arial Narrow'; rke2.font.size = _Pt(12)
     doc.add_page_break()
 
+    # ── Secciones numeradas (RCSI) ────────────────────────────────────────────
     for heading, key in [
-        ("I. INTRODUCCIÓN", 'introduction'),
-        ("II. MATERIALES Y MÉTODOS", 'methodology'),
-        ("III. RESULTADOS", 'results'),
-        ("IV. DISCUSIÓN", 'discussion'),
-        ("V. CONCLUSIONES", 'conclusions'),
+        ("1    Introducción",          'introduction'),
+        ("2    Materiales y métodos",  'methodology'),
+        ("3    Resultados y discusión",'resultados_discusion'),
     ]:
         add_h(heading, 1)
-        content = sec.get(key, '')
-        add_para(str(content) if not isinstance(content, str) else content)
+        add_para(str(sec.get(key, '')))
+
+    # ── Conclusiones ──────────────────────────────────────────────────────────
+    add_h("Conclusiones", 2)
+    add_para(str(sec.get('conclusions', '')))
+
+    # ── Secciones finales RCSI ────────────────────────────────────────────────
+    add_h("Agradecimientos", 2)
+    add_para(str(sec.get('agradecimientos', '')))
+
+    add_h("Conflicto de intereses", 2)
+    add_para(str(sec.get('conflicto_intereses', 'No existe ningún tipo de conflicto de interés relacionado con la materia del trabajo.')))
+
+    add_h("Fuente de financiamiento", 2)
+    add_para(str(sec.get('fuente_financiamiento', 'Los autores no recibieron ningún patrocinio para llevar a cabo este estudio.')))
+
+    add_h("Contribución de autoría", 2)
+    credit_roles = [
+        "Conceptualización", "Curación de datos", "Análisis formal",
+        "Investigación", "Metodología", "Administración del proyecto",
+        "Recursos", "Software", "Supervisión", "Validación",
+        "Visualización", "Redacción - borrador original", "Redacción - revisión y edición",
+    ]
+    for i, role in enumerate(credit_roles):
+        add_para(f"{i+1}. {role}: {authors[i % len(authors)]}", sz=11)
+
+    add_h("Disponibilidad de datos depositados", 2)
+    add_para(str(sec.get('disponibilidad_datos', 'No aplica.')))
 
     doc.add_page_break()
 
-    add_h("REFERENCIAS", 1)
-    for ref in refs[:20]:
+    # ── Referencias bibliográficas (APA 7, mín. 30) ───────────────────────────
+    add_h("Referencias bibliográficas", 1)
+    for ref in refs[:30]:
         add_para(ref)
 
     doc.save(path)
@@ -3408,7 +3555,8 @@ def generate_document(data: dict) -> dict:
     doc_type = data.get('doc_type', 'tesis')
     template_structure = data.get('template_structure', None)
 
-    refs = _gen_references(title)
+    n_refs = 30 if doc_type == 'articulo' else 25
+    refs = _gen_references(title, n=n_refs)
 
     # Decodificar logo si viene en base64
     logo_path = None
