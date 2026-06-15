@@ -1,7 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
-import { FileText, Download, Loader2, Sparkles, BookOpen, User, Users, MapPin, Calendar, ImagePlus, X } from 'lucide-react'
-import { generateThesis, downloadThesisFile, getThesisPdfBlob, getUsers } from '../api'
-import type { ThesisResult } from '../api'
+import {
+  FileText, Download, Loader2, Sparkles, BookOpen,
+  User, Users, MapPin, Calendar, ImagePlus, X,
+  FileUp, GraduationCap, Newspaper, ClipboardList,
+} from 'lucide-react'
+import { generateDocument, downloadThesisFile, getThesisPdfBlob, getUsers } from '../api'
+import type { ThesisResult, DocType } from '../api'
 
 const RESEARCH_LINES = [
   'Gestión de Gobierno y Servicios de TIC',
@@ -12,6 +16,50 @@ const RESEARCH_LINES = [
 ]
 
 const CITIES = ['Trujillo', 'Lima', 'Arequipa', 'Chiclayo', 'Piura', 'Cusco', 'Iquitos', 'Huancayo']
+
+const DOC_TYPES: { value: DocType; label: string; desc: string; icon: typeof BookOpen; color: string; sections: string[] }[] = [
+  {
+    value: 'tesis',
+    label: 'Tesis',
+    desc: 'Documento completo con 5 capítulos, resultados, discusión y conclusiones.',
+    icon: GraduationCap,
+    color: 'blue',
+    sections: [
+      'Carátula + Jurado', 'Resumen / Abstract',
+      'Cap. I: Introducción', 'Cap. II: Metodología',
+      'Cap. III: Resultados', 'Cap. IV: Discusión',
+      'Cap. V: Conclusiones', '≤ 25 refs APA V7',
+      'Árbol de problemas', 'Declaración jurada',
+    ],
+  },
+  {
+    value: 'proyecto_tesis',
+    label: 'Proyecto de Tesis',
+    desc: 'Propuesta de investigación con cronograma, presupuesto y matrices.',
+    icon: ClipboardList,
+    color: 'emerald',
+    sections: [
+      'Carátula', 'Resumen / Abstract',
+      'Cap. I: Problema de investigación', 'Cap. II: Marco metodológico',
+      'Cap. III: Aspectos administrativos', 'Cronograma de actividades',
+      'Presupuesto detallado', 'Matriz de consistencia',
+      'Operacionalización de variables', 'Declaración jurada',
+    ],
+  },
+  {
+    value: 'articulo',
+    label: 'Artículo de Investigación',
+    desc: 'Formato de artículo científico con abstract, métodos y resultados.',
+    icon: Newspaper,
+    color: 'violet',
+    sections: [
+      'Título + Autores + Filiación', 'Resumen / Abstract + Keywords',
+      'I. Introducción', 'II. Materiales y Métodos',
+      'III. Resultados', 'IV. Discusión',
+      'V. Conclusiones', '≤ 20 referencias',
+    ],
+  },
+]
 
 interface FormState {
   title: string
@@ -31,17 +79,31 @@ const INITIAL: FormState = {
   year: new Date().getFullYear(),
 }
 
+const colorMap: Record<string, string> = {
+  blue:    'border-blue-500 bg-blue-50 text-blue-700',
+  emerald: 'border-emerald-500 bg-emerald-50 text-emerald-700',
+  violet:  'border-violet-500 bg-violet-50 text-violet-700',
+}
+const btnColorMap: Record<string, string> = {
+  blue:    'bg-blue-600 hover:bg-blue-700',
+  emerald: 'bg-emerald-600 hover:bg-emerald-700',
+  violet:  'bg-violet-600 hover:bg-violet-700',
+}
+
 export default function GenerarTesisPage() {
+  const [docType, setDocType]     = useState<DocType>('tesis')
   const [form, setForm]           = useState<FormState>(INITIAL)
   const [loading, setLoading]     = useState(false)
   const [result, setResult]       = useState<ThesisResult | null>(null)
   const [error, setError]         = useState('')
   const [pdfUrl, setPdfUrl]       = useState('')
   const [loadingPdf, setLoadingPdf] = useState(false)
-  const [logoData, setLogoData]   = useState<string>('')      // base64 data-URL
-  const [logoPreview, setLogoPreview] = useState<string>('')  // object URL for <img>
-  const logoInputRef = useRef<HTMLInputElement>(null)
+  const [logoData, setLogoData]   = useState<string>('')
+  const [logoPreview, setLogoPreview] = useState<string>('')
+  const [templateFile, setTemplateFile] = useState<File | null>(null)
   const [advisors, setAdvisors]   = useState<{ id: number; name: string }[]>([])
+  const logoInputRef = useRef<HTMLInputElement>(null)
+  const templateInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     getUsers('ADVISOR')
@@ -64,13 +126,25 @@ export default function GenerarTesisPage() {
     reader.readAsDataURL(file)
   }
 
+  const handleTemplateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setTemplateFile(file)
+  }
+
   const removeLogo = () => {
     setLogoData('')
     setLogoPreview('')
     if (logoInputRef.current) logoInputRef.current.value = ''
   }
 
+  const removeTemplate = () => {
+    setTemplateFile(null)
+    if (templateInputRef.current) templateInputRef.current.value = ''
+  }
+
   const valid = form.title.trim() && form.authors.trim() && form.advisor.trim()
+  const activeType = DOC_TYPES.find(d => d.value === docType)!
 
   const handleGenerate = async () => {
     if (!valid) return
@@ -79,7 +153,8 @@ export default function GenerarTesisPage() {
     setResult(null)
     setPdfUrl('')
     try {
-      const res = await generateThesis({
+      const res = await generateDocument({
+        doc_type:      docType,
         title:         form.title.trim(),
         authors:       form.authors.trim(),
         advisor:       form.advisor.trim(),
@@ -87,9 +162,9 @@ export default function GenerarTesisPage() {
         city:          form.city,
         year:          form.year,
         logo_data:     logoData || undefined,
+        template_file: templateFile,
       })
       setResult(res)
-      // Load PDF preview
       setLoadingPdf(true)
       try {
         const url = await getThesisPdfBlob(res.pdf_file)
@@ -98,7 +173,7 @@ export default function GenerarTesisPage() {
         setLoadingPdf(false)
       }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Error al generar la tesis'
+      const msg = e instanceof Error ? e.message : 'Error al generar el documento'
       setError(msg)
     } finally {
       setLoading(false)
@@ -107,8 +182,13 @@ export default function GenerarTesisPage() {
 
   const handleDownload = (type: 'pdf' | 'docx') => {
     if (!result) return
-    const file = type === 'pdf' ? result.pdf_file : result.docx_file
-    downloadThesisFile(file)
+    downloadThesisFile(type === 'pdf' ? result.pdf_file : result.docx_file)
+  }
+
+  const docTypeLabel: Record<DocType, string> = {
+    tesis: 'Tesis',
+    proyecto_tesis: 'Proyecto de Tesis',
+    articulo: 'Artículo de Investigación',
   }
 
   return (
@@ -119,11 +199,36 @@ export default function GenerarTesisPage() {
           <BookOpen className="text-blue-700" size={24} />
         </div>
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Generador de Tesis</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Generador de Documentos Académicos</h1>
           <p className="text-sm text-gray-500">
-            Genera automáticamente el contenido estructurado de tu tesis en PDF y Word
+            Genera tesis, proyectos de tesis o artículos en PDF y Word a partir de tus datos y una plantilla opcional
           </p>
         </div>
+      </div>
+
+      {/* Selector de tipo de documento */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {DOC_TYPES.map(dt => {
+          const Icon = dt.icon
+          const isActive = docType === dt.value
+          return (
+            <button
+              key={dt.value}
+              onClick={() => { setDocType(dt.value); setResult(null); setPdfUrl('') }}
+              className={`text-left p-4 rounded-xl border-2 transition-all ${
+                isActive
+                  ? colorMap[dt.color]
+                  : 'border-gray-200 bg-white hover:border-gray-300 text-gray-700'
+              }`}
+            >
+              <div className="flex items-center gap-2 mb-1">
+                <Icon size={18} />
+                <span className="font-semibold text-sm">{dt.label}</span>
+              </div>
+              <p className="text-xs opacity-80">{dt.desc}</p>
+            </button>
+          )
+        })}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -131,13 +236,13 @@ export default function GenerarTesisPage() {
         <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 space-y-5">
           <div className="flex items-center gap-2 pb-2 border-b border-gray-100">
             <Sparkles size={18} className="text-blue-600" />
-            <h2 className="font-semibold text-gray-800">Datos de la tesis</h2>
+            <h2 className="font-semibold text-gray-800">Datos del documento</h2>
           </div>
 
           {/* Título */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
-              <FileText size={14} /> Título de la tesis *
+              <FileText size={14} /> Título de la investigación *
             </label>
             <textarea
               value={form.title}
@@ -157,7 +262,7 @@ export default function GenerarTesisPage() {
               type="text"
               value={form.authors}
               onChange={set('authors')}
-              placeholder="Ej: Juan Carlos Pérez López, María Elena Rodríguez Sánchez"
+              placeholder="Ej: Juan Pérez López, María Rodríguez Sánchez"
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -197,9 +302,7 @@ export default function GenerarTesisPage() {
               onChange={set('research_line')}
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
             >
-              {RESEARCH_LINES.map(l => (
-                <option key={l} value={l}>{l}</option>
-              ))}
+              {RESEARCH_LINES.map(l => <option key={l} value={l}>{l}</option>)}
             </select>
           </div>
 
@@ -229,6 +332,51 @@ export default function GenerarTesisPage() {
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>
+          </div>
+
+          {/* Plantilla (nuevo) */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+              <FileUp size={14} /> Plantilla de referencia
+              <span className="font-normal text-gray-400">(opcional, DOCX o PDF)</span>
+            </label>
+            {templateFile ? (
+              <div className="flex items-center gap-3 p-3 border border-emerald-200 rounded-lg bg-emerald-50">
+                <FileText size={20} className="text-emerald-600 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-emerald-800 truncate">{templateFile.name}</p>
+                  <p className="text-xs text-emerald-600">
+                    Se analizará la estructura y se usará como modelo
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={removeTemplate}
+                  className="p-1 text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                  title="Quitar plantilla"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <label className="flex flex-col items-center justify-center gap-1.5 w-full h-20 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-emerald-400 hover:bg-emerald-50 transition-colors">
+                <FileUp size={20} className="text-gray-400" />
+                <span className="text-xs text-gray-500">Haz clic para subir plantilla DOCX o PDF</span>
+                <input
+                  ref={templateInputRef}
+                  type="file"
+                  accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                  className="hidden"
+                  onChange={handleTemplateChange}
+                />
+              </label>
+            )}
+            {templateFile && (
+              <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+                El sistema detectará sus secciones, tablas, matrices, cronogramas y presupuestos,
+                y generará el nuevo documento siguiendo esa misma estructura con contenido adaptado al título.
+              </p>
+            )}
           </div>
 
           {/* Logo institucional */}
@@ -276,30 +424,37 @@ export default function GenerarTesisPage() {
           <button
             onClick={handleGenerate}
             disabled={loading || !valid}
-            className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-colors text-sm"
+            className={`w-full flex items-center justify-center gap-2 ${btnColorMap[activeType.color]} disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-semibold py-3 rounded-lg transition-colors text-sm`}
           >
             {loading ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                Generando tesis... (puede tardar 30-60 s)
+                Generando {docTypeLabel[docType]}... (puede tardar 30–90 s)
               </>
             ) : (
               <>
                 <Sparkles size={18} />
-                Generar tesis completa
+                Generar {docTypeLabel[docType]}
               </>
             )}
           </button>
 
-          {/* Especificaciones */}
-          <div className="bg-blue-50 rounded-lg p-4 text-xs text-blue-800 space-y-1">
-            <p className="font-semibold text-blue-900">Formato generado:</p>
-            <p>• Arial Narrow 12 pt · Interlineado 1.5 · Justificado</p>
-            <p>• Márgenes: Izq 3 cm / Der-Sup-Inf 2.5 cm</p>
-            <p>• Numeración arábiga esquina inferior derecha</p>
-            <p>• Cap. I–V completos · ≥ 50 páginas</p>
-            <p>• Máx. 25 referencias APA V7 · 80% inglés · 80% últimos 5 años</p>
-            <p>• Logo institucional en carátula (si se sube)</p>
+          {/* Info del tipo seleccionado */}
+          <div className={`rounded-lg p-4 text-xs space-y-1 ${
+            docType === 'tesis' ? 'bg-blue-50 text-blue-800' :
+            docType === 'proyecto_tesis' ? 'bg-emerald-50 text-emerald-800' :
+            'bg-violet-50 text-violet-800'
+          }`}>
+            <p className="font-semibold">Contenido generado:</p>
+            {activeType.sections.map(s => <p key={s}>• {s}</p>)}
+            {docType !== 'articulo' && (
+              <p className="mt-1 font-medium">Arial Narrow 12 pt · Interlineado 1.5 · Márgenes 3/2.5 cm</p>
+            )}
+            {templateFile && (
+              <p className="mt-1 font-medium text-orange-700 bg-orange-100 rounded px-2 py-1">
+                Con plantilla: estructura y tablas adaptadas al nuevo título
+              </p>
+            )}
           </div>
         </div>
 
@@ -307,10 +462,9 @@ export default function GenerarTesisPage() {
         <div className="space-y-4">
           {result ? (
             <>
-              {/* Badges de estado */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 space-y-4">
                 <div className="flex items-center justify-between">
-                  <h2 className="font-semibold text-gray-800">Tesis generada</h2>
+                  <h2 className="font-semibold text-gray-800">{docTypeLabel[result.doc_type as DocType ?? 'tesis']} generado</h2>
                   <span className={`text-xs px-2.5 py-1 rounded-full font-medium ${
                     result.source === 'openai'
                       ? 'bg-purple-100 text-purple-700'
@@ -320,22 +474,19 @@ export default function GenerarTesisPage() {
                   </span>
                 </div>
 
-                {/* Secciones generadas */}
                 <div className="grid grid-cols-2 gap-2">
-                  {[
-                    'Resumen / Abstract', 'Cap. I: Introducción',
-                    'Realidad problemática', 'Antecedentes', 'Marco teórico',
-                    'Cap. II: Metodología', 'Cap. III: Resultados',
-                    'Cap. IV: Discusión', 'Cap. V: Conclusiones',
-                    'Máx. 25 refs APA V7', 'Árbol de problemas', 'Declaración jurada',
-                  ].map(s => (
+                  {activeType.sections.map(s => (
                     <div key={s} className="flex items-center gap-1.5 text-xs text-gray-600">
                       <span className="text-green-500 font-bold">✓</span> {s}
                     </div>
                   ))}
+                  {templateFile && (
+                    <div className="col-span-2 flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 rounded px-2 py-1">
+                      <span className="font-bold">✓</span> Estructura basada en plantilla subida
+                    </div>
+                  )}
                 </div>
 
-                {/* Botones de descarga */}
                 <div className="grid grid-cols-2 gap-3 pt-2">
                   <button
                     onClick={() => handleDownload('pdf')}
@@ -354,7 +505,6 @@ export default function GenerarTesisPage() {
                 </div>
               </div>
 
-              {/* Vista previa PDF */}
               <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 <div className="px-5 py-3 border-b border-gray-100 flex items-center gap-2">
                   <FileText size={16} className="text-red-500" />
@@ -368,7 +518,7 @@ export default function GenerarTesisPage() {
                 ) : pdfUrl ? (
                   <iframe
                     src={pdfUrl}
-                    title="Vista previa de tesis"
+                    title="Vista previa del documento"
                     className="w-full"
                     style={{ height: '520px', border: 'none' }}
                   />
@@ -383,23 +533,18 @@ export default function GenerarTesisPage() {
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 flex flex-col items-center justify-center text-center text-gray-400 min-h-[400px] space-y-4">
               <BookOpen size={48} className="text-gray-200" />
               <div>
-                <p className="font-medium text-gray-500">Completa el formulario</p>
+                <p className="font-medium text-gray-500">Completa el formulario y selecciona el tipo</p>
                 <p className="text-sm mt-1">
-                  La tesis generada aparecerá aquí con su previsualización y botones de descarga.
+                  El documento generado aparecerá aquí con su previsualización y botones de descarga.
                 </p>
               </div>
               <div className="bg-gray-50 rounded-lg p-4 text-left text-xs text-gray-500 w-full max-w-xs space-y-1.5">
-                <p className="font-semibold text-gray-600 mb-2">Contenido generado (≥ 50 páginas):</p>
-                <p>📄 Carátula con logo · Jurado · Índices</p>
-                <p>📝 Resumen y Abstract</p>
-                <p>📗 Cap. I: Introducción completa</p>
-                <p>📘 Cap. II: Metodología detallada</p>
-                <p>📊 Cap. III: Resultados con tablas</p>
-                <p>💬 Cap. IV: Discusión</p>
-                <p>✅ Cap. V: Conclusiones y Recomendaciones</p>
-                <p>📚 Máx. 25 referencias APA V7</p>
-                <p>🌳 Árboles de problemas y objetivos</p>
-                <p>✍️ Declaración jurada</p>
+                <p className="font-semibold text-gray-600 mb-2">Tipos disponibles:</p>
+                <p>🎓 <b>Tesis</b> — 5 capítulos completos, ≥ 50 págs.</p>
+                <p>📋 <b>Proyecto de tesis</b> — propuesta con cronograma y presupuesto</p>
+                <p>📰 <b>Artículo</b> — formato de publicación científica</p>
+                <p className="mt-2 font-semibold text-gray-600">Con plantilla subida:</p>
+                <p>📄 Analiza estructura y adapta secciones, tablas, matrices y gráficos al nuevo título</p>
               </div>
             </div>
           )}

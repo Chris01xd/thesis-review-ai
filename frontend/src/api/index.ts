@@ -159,16 +159,47 @@ export interface ThesisResult {
   pdf_file: string
   docx_file: string
   source: 'openai' | 'template'
+  doc_type?: string
   sections: Record<string, string | string[]>
+}
+
+export type DocType = 'tesis' | 'proyecto_tesis' | 'articulo'
+
+export interface DocumentRequest {
+  doc_type: DocType
+  title: string
+  authors: string
+  advisor: string
+  research_line: string
+  city: string
+  year: number
+  logo_data?: string
+  template_file?: File | null
 }
 
 export const generateThesis = (data: ThesisRequest) =>
   client.post<ThesisResult>('/api/generar_tesis', data, { timeout: 120000 }).then((r) => r.data)
 
+export const generateDocument = (data: DocumentRequest) => {
+  const fd = new FormData()
+  fd.append('doc_type', data.doc_type)
+  fd.append('title', data.title)
+  fd.append('authors', data.authors)
+  fd.append('advisor', data.advisor)
+  fd.append('research_line', data.research_line)
+  fd.append('city', data.city)
+  fd.append('year', String(data.year))
+  if (data.logo_data) fd.append('logo_data', data.logo_data)
+  if (data.template_file) fd.append('template_file', data.template_file)
+  return client.post<ThesisResult>('/api/generar_documento', fd, {
+    timeout: 180000,
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }).then((r) => r.data)
+}
+
 export const downloadThesisFile = async (filename: string) => {
-  const res = await client.get(`/api/generar_tesis/download/${filename}`, {
-    responseType: 'blob',
-  })
+  const base = filename.startsWith('doc_') ? '/api/generar_documento/download' : '/api/generar_tesis/download'
+  const res = await client.get(`${base}/${filename}`, { responseType: 'blob' })
   const ext = filename.endsWith('.pdf') ? 'pdf' : 'docx'
   const mime = ext === 'pdf'
     ? 'application/pdf'
@@ -181,9 +212,8 @@ export const downloadThesisFile = async (filename: string) => {
 }
 
 export const getThesisPdfBlob = async (filename: string): Promise<string> => {
-  const res = await client.get(`/api/generar_tesis/download/${filename}`, {
-    responseType: 'blob',
-  })
+  const base = filename.startsWith('doc_') ? '/api/generar_documento/download' : '/api/generar_tesis/download'
+  const res = await client.get(`${base}/${filename}`, { responseType: 'blob' })
   return URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }))
 }
 

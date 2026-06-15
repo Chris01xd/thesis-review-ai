@@ -13,7 +13,8 @@ from modules.plagiarism import run_similarity_check
 from modules.citations import validate_citations
 from modules.reports import generate_review_pdf, generate_similarity_pdf, generate_ai_detection_pdf
 from modules.email_service import send_review_email, send_batch_review_email, send_test_email
-from modules.thesis_generator import generate_thesis
+from modules.thesis_generator import generate_thesis, generate_document
+from modules.template_analyzer import analyze_template
 from modules.open_similarity import run_open_similarity
 from modules.ai_detector import run_ai_detection
 
@@ -920,6 +921,81 @@ def generar_tesis(req: ThesisRequest):
 @app.get("/api/generar_tesis/download/{filename}", summary="Descargar archivo de tesis", tags=["Tesis"])
 def download_thesis_file(filename: str):
     """Descarga el PDF o DOCX generado."""
+    path = os.path.join("data/thesis", filename)
+    if not os.path.exists(path) or ".." in filename:
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    media_type = "application/pdf" if filename.endswith(".pdf") else \
+                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    return FileResponse(path, media_type=media_type, filename=filename)
+
+
+# ── Generador de documentos académicos (con plantilla opcional) ───────────────
+
+@app.post("/api/generar_documento",
+          summary="Generar documento académico (tesis, proyecto o artículo) con plantilla opcional",
+          tags=["Tesis"])
+async def generar_documento(
+    doc_type:      str           = Form("tesis"),
+    title:         str           = Form(...),
+    authors:       str           = Form(...),
+    advisor:       str           = Form(...),
+    research_line: str           = Form("Gestión de Desarrollo de Software"),
+    city:          str           = Form("Trujillo"),
+    year:          int           = Form(2026),
+    logo_data:     Optional[str] = Form(None),
+    template_file: Optional[UploadFile] = File(None),
+):
+    """
+    Genera un documento académico completo en PDF y DOCX.
+
+    - **doc_type**: "tesis" | "proyecto_tesis" | "articulo"
+    - **template_file**: plantilla DOCX o PDF opcional para respetar su estructura
+    - Todos los campos de texto son usados para personalizar el contenido.
+    """
+    template_structure = None
+
+    if template_file and template_file.filename:
+        ext = os.path.splitext(template_file.filename or "")[1].lower().lstrip(".")
+        if ext not in ("docx", "pdf"):
+            raise HTTPException(status_code=400, detail="La plantilla debe ser DOCX o PDF.")
+        os.makedirs("data/uploads", exist_ok=True)
+        tmp_path = f"data/uploads/tpl_{int(time.time())}_{template_file.filename}"
+        try:
+            content = await template_file.read()
+            with open(tmp_path, "wb") as f_out:
+                f_out.write(content)
+            template_structure = analyze_template(tmp_path, ext)
+        except Exception as e:
+            print(f"[generar_documento] Error procesando plantilla: {e}")
+        finally:
+            if os.path.exists(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except Exception:
+                    pass
+
+    try:
+        result = generate_document({
+            'doc_type':          doc_type,
+            'title':             title,
+            'authors':           authors,
+            'advisor':           advisor,
+            'research_line':     research_line,
+            'city':              city,
+            'year':              year,
+            'logo_data':         logo_data,
+            'template_structure': template_structure,
+        })
+        return result
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error generando documento: {e}")
+
+
+@app.get("/api/generar_documento/download/{filename}",
+         summary="Descargar documento académico generado",
+         tags=["Tesis"])
+def download_documento_file(filename: str):
+    """Descarga el PDF o DOCX generado por /api/generar_documento."""
     path = os.path.join("data/thesis", filename)
     if not os.path.exists(path) or ".." in filename:
         raise HTTPException(status_code=404, detail="Archivo no encontrado")

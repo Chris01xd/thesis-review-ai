@@ -1653,3 +1653,1143 @@ def generate_thesis(data: dict) -> dict:
         'sections':  {k: (v[:200] + '...' if isinstance(v, str) and len(v) > 200 else v)
                       for k, v in sec.items() if isinstance(v, (str, list))},
     }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GENERACIÓN DE TIPOS DE DOCUMENTO ADICIONALES
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Tablas académicas estándar ─────────────────────────────────────────────────
+
+def _tabla_cronograma(title: str) -> list:
+    """Genera filas para un cronograma de actividades de 6 meses."""
+    kw = title.split()[:3]
+    actividades = [
+        "Revisión bibliográfica y estado del arte",
+        f"Elaboración del marco teórico sobre {' '.join(kw)}",
+        "Diseño del instrumento de recolección de datos",
+        "Validación del instrumento (juicio de expertos)",
+        "Recolección de datos en campo",
+        "Procesamiento y análisis estadístico",
+        "Redacción de resultados y discusión",
+        "Revisión y corrección del documento final",
+        "Sustentación del proyecto",
+    ]
+    rows = []
+    for i, act in enumerate(actividades):
+        row = [act]
+        for mes in range(1, 7):
+            row.append("X" if mes in [(i // 2) + 1, (i // 2) + 2] else "")
+        rows.append(row)
+    return rows
+
+
+def _tabla_presupuesto(title: str) -> list:
+    kw = " ".join(title.split()[:3])
+    items = [
+        ("Recursos Humanos", "", "", ""),
+        (f"  Asesor especialista en {kw}", "1", "S/. 3,000.00", "S/. 3,000.00"),
+        ("  Estadístico", "1", "S/. 800.00", "S/. 800.00"),
+        ("  Digitador / transcritor", "1", "S/. 300.00", "S/. 300.00"),
+        ("Materiales", "", "", ""),
+        ("  Papel bond A4 (500 hojas)", "2 millares", "S/. 30.00", "S/. 60.00"),
+        ("  Lapiceros, marcadores", "1 juego", "S/. 20.00", "S/. 20.00"),
+        ("  USB y materiales de cómputo", "2 unidades", "S/. 40.00", "S/. 80.00"),
+        ("Servicios", "", "", ""),
+        ("  Impresión y empastado", "3 ejemplares", "S/. 80.00", "S/. 240.00"),
+        ("  Internet y comunicaciones", "6 meses", "S/. 60.00", "S/. 360.00"),
+        ("  Movilidad y viáticos", "estimado", "S/. 200.00", "S/. 200.00"),
+        ("  Tramites y derechos académicos", "global", "S/. 500.00", "S/. 500.00"),
+        ("TOTAL", "", "", "S/. 5,560.00"),
+    ]
+    return items
+
+
+def _tabla_consistencia(title: str, obj_esp: list) -> list:
+    kw = " ".join(title.split()[:4])
+    if not obj_esp:
+        obj_esp = [
+            f"Diagnosticar el estado actual de {kw}",
+            f"Diseñar la propuesta de {kw}",
+            f"Implementar y evaluar {kw}",
+        ]
+    rows = []
+    for i, obj in enumerate(obj_esp[:3], 1):
+        rows.append([
+            f"¿De qué manera el {kw} influye en el objetivo {i}?",
+            obj,
+            f"H{i}: El {kw} mejora significativamente el objetivo {i}",
+            f"Variable {i}: " + ("Independiente" if i == 1 else "Dependiente"),
+            f"Indicador OE{i}: Porcentaje de mejora",
+            "Cuestionario / Guía de observación",
+            "Cuantitativo / Explicativo",
+        ])
+    return rows
+
+
+def _tabla_operacionalizacion(title: str) -> list:
+    kw = " ".join(title.split()[:4])
+    return [
+        ["Variable Independiente", f"Sistema/Proceso relacionado con {kw}",
+         "Funcionalidad", "Nivel de cumplimiento de funciones", "Ordinal (1-5)", "Cuestionario"],
+        ["Variable Independiente", f"Sistema/Proceso relacionado con {kw}",
+         "Usabilidad", "Facilidad de uso percibida por usuarios", "Ordinal (1-5)", "Cuestionario"],
+        ["Variable Independiente", f"Sistema/Proceso relacionado con {kw}",
+         "Confiabilidad", "Disponibilidad del sistema (%)", "Razón", "Registro técnico"],
+        ["Variable Dependiente", f"Resultados asociados a {kw}",
+         "Eficiencia operativa", "Tiempo promedio de proceso (min)", "Razón", "Guía de observación"],
+        ["Variable Dependiente", f"Resultados asociados a {kw}",
+         "Satisfacción del usuario", "Índice de satisfacción (%)", "Razón", "Cuestionario"],
+        ["Variable Dependiente", f"Resultados asociados a {kw}",
+         "Reducción de errores", "Tasa de error antes vs. después (%)", "Razón", "Registro de incidencias"],
+    ]
+
+
+# ── Contenido: Proyecto de Tesis ───────────────────────────────────────────────
+
+def _content_proyecto_tesis(title: str, rl: str) -> dict:
+    """Genera el contenido completo para un Proyecto de Tesis."""
+    sec = _intro_text({'title': title, 'research_line': rl}, _gen_references(title))
+    sec['resumen'] = _resumen(title, rl)
+    sec['abstract'] = _abstract(title, rl)
+
+    kw = " ".join(title.split()[:4])
+    year = datetime.now().year
+
+    sec['cap2_proyecto'] = (
+        f"La investigación se enmarca en un enfoque cuantitativo con diseño pre-experimental "
+        f"de un solo grupo con pre y post test. El tipo de investigación es aplicada, ya que busca "
+        f"resolver una problemática concreta relacionada con {kw}. El nivel es explicativo-correlacional, "
+        f"orientado a determinar el efecto de la variable independiente sobre la dependiente. "
+        f"La población está constituida por 180 colaboradores del área de estudio, y la muestra, "
+        f"calculada mediante muestreo aleatorio estratificado con un 95% de confianza y margen de error "
+        f"del 5%, asciende a 123 participantes. Los instrumentos han sido validados mediante juicio de "
+        f"expertos (CVC = 0.87) y prueba de confiabilidad (α = 0.912, Cronbach)."
+    )
+
+    sec['cronograma_rows'] = _tabla_cronograma(title)
+    sec['presupuesto_rows'] = _tabla_presupuesto(title)
+    sec['consistencia_rows'] = _tabla_consistencia(title, sec.get('obj_esp', []))
+    sec['operacionalizacion_rows'] = _tabla_operacionalizacion(title)
+
+    return sec
+
+
+# ── Contenido: Artículo de Investigación ──────────────────────────────────────
+
+def _content_articulo(title: str, rl: str) -> dict:
+    """Genera el contenido para un Artículo de Investigación."""
+    kw = " ".join(title.split()[:5])
+    year = datetime.now().year
+
+    abstract_es = (
+        f"El presente artículo analiza el impacto de {kw} en el contexto peruano, "
+        f"abordando la problemática desde una perspectiva cuantitativa. Se aplicó un diseño "
+        f"cuasi-experimental con pre y post test a una muestra de 123 participantes seleccionados "
+        f"mediante muestreo aleatorio estratificado. Los resultados evidencian mejoras "
+        f"estadísticamente significativas (p < 0.05) en los indicadores clave tras la implementación "
+        f"de la propuesta. Se concluye que {kw} contribuye de manera efectiva a la optimización "
+        f"de los procesos estudiados. Se recomienda ampliar el estudio a contextos institucionales "
+        f"similares para validar la generalización de los hallazgos."
+    )
+    abstract_en = (
+        f"This article analyzes the impact of {kw} in the Peruvian context, addressing the "
+        f"problematic from a quantitative perspective. A quasi-experimental design with pre and "
+        f"post-test was applied to a sample of 123 participants selected through stratified random "
+        f"sampling. Results show statistically significant improvements (p < 0.05) in key indicators "
+        f"after the implementation of the proposal. It is concluded that {kw} effectively contributes "
+        f"to the optimization of the studied processes. Further research is recommended to validate "
+        f"generalization across similar institutional contexts."
+    )
+
+    introduction = (
+        f"En la actualidad, {kw} representa uno de los ejes centrales del desarrollo organizacional "
+        f"y tecnológico en América Latina. Diversos organismos internacionales, como la UNESCO y el "
+        f"Banco Mundial, han señalado la necesidad de adoptar estrategias basadas en evidencia para "
+        f"mejorar los procesos vinculados a {kw}. En el contexto peruano, la situación no es diferente: "
+        f"múltiples estudios evidencian brechas significativas en la implementación de soluciones "
+        f"tecnológicas que optimicen {kw}. El presente artículo tiene como objetivo evaluar el efecto "
+        f"de una intervención sistemática sobre los indicadores de desempeño asociados a {kw}, "
+        f"contribuyendo así al cuerpo de conocimiento existente en la materia."
+    )
+
+    methodology = (
+        f"Se empleó un diseño cuasi-experimental con un grupo de control y un grupo experimental. "
+        f"La muestra estuvo conformada por 123 participantes (n = 123) seleccionados mediante "
+        f"muestreo aleatorio estratificado con un nivel de confianza del 95% y margen de error del 5%. "
+        f"El instrumento de recolección fue un cuestionario estructurado de 25 ítems (escala Likert 1-5), "
+        f"validado mediante juicio de expertos (CVC = 0.87) y con alta confiabilidad (α = 0.912). "
+        f"El análisis estadístico incluyó pruebas de normalidad (Shapiro-Wilk), estadística descriptiva "
+        f"e inferencial (prueba t de Student para datos paramétricos y Wilcoxon para no paramétricos), "
+        f"procesados con SPSS v.26."
+    )
+
+    results = (
+        f"Los resultados del pre-test mostraron que el 68.3% de los participantes presentaban "
+        f"niveles insatisfactorios en los indicadores evaluados. Tras la implementación de la "
+        f"intervención relacionada con {kw}, el post-test reveló una mejora significativa: el 84.6% "
+        f"alcanzó niveles satisfactorios o superiores. La prueba t de Student arrojó un valor "
+        f"t(122) = 8.47, p < 0.001, IC 95% [12.3, 19.8], lo que indica diferencias estadísticamente "
+        f"significativas entre el pre y post test. El tamaño del efecto (d de Cohen = 1.52) "
+        f"refleja un impacto grande de la intervención propuesta."
+    )
+
+    discussion = (
+        f"Los hallazgos obtenidos son consistentes con lo reportado por investigaciones previas "
+        f"sobre {kw}. En línea con los postulados de la Teoría de Aceptación Tecnológica (TAM), "
+        f"los participantes mostraron alta percepción de utilidad y facilidad de uso, lo que facilitó "
+        f"la adopción de las estrategias propuestas. Estos resultados contrastan con estudios de "
+        f"contextos similares que reportan tasas de mejora menores, posiblemente por diferencias "
+        f"metodológicas o en las características de la muestra. Las implicaciones prácticas sugieren "
+        f"que la réplica de esta intervención en instituciones similares podría generar beneficios "
+        f"comparables, siempre que se garanticen las condiciones de capacitación y seguimiento."
+    )
+
+    conclusions = (
+        f"Se concluye que la implementación de la propuesta relacionada con {kw} generó mejoras "
+        f"estadísticamente significativas (p < 0.001) en los indicadores de desempeño evaluados, "
+        f"con un tamaño de efecto grande (d = 1.52). La intervención demostró ser viable, replicable "
+        f"y pertinente para el contexto peruano. Se recomienda realizar estudios longitudinales para "
+        f"evaluar la sostenibilidad de los efectos a largo plazo, así como ampliar la muestra a "
+        f"contextos geográficos e institucionales distintos para fortalecer la validez externa del estudio."
+    )
+
+    return {
+        'resumen':      abstract_es,
+        'abstract':     abstract_en,
+        'introduction': introduction,
+        'methodology':  methodology,
+        'results':      results,
+        'discussion':   discussion,
+        'conclusions':  conclusions,
+    }
+
+
+# ── Mapeo de sección de plantilla → contenido ──────────────────────────────────
+
+def _map_section_to_content(section_title: str, title: str, rl: str,
+                             all_sec: dict) -> str:
+    """Devuelve contenido textual para una sección de plantilla dado su título."""
+    norm = section_title.lower()
+    for c in 'áéíóú':
+        norm = norm.replace(c, 'aeiou'['áéíóú'.index(c)])
+
+    if any(k in norm for k in ['realidad problem', 'situacion problem', 'contexto']):
+        return _rp(title, rl)
+    if any(k in norm for k in ['antecedente', 'estado del arte', 'trabajos previos']):
+        return _ant(title)
+    if any(k in norm for k in ['marco teorico', 'bases teoricas', 'fundamentacion']):
+        return _mt(title, rl)
+    if any(k in norm for k in ['justificacion', 'importancia', 'relevancia']):
+        return _just(title)
+    if any(k in norm for k in ['planteamiento', 'problema de investigacion', 'formulacion']):
+        return all_sec.get('prob', f"¿De qué manera {title.split()[0] if title else 'la propuesta'} influye en los resultados organizacionales?")
+    if any(k in norm for k in ['hipotesis', 'suposicion']):
+        return all_sec.get('hip', f"La implementación de {' '.join(title.split()[:4])} mejora significativamente los indicadores de desempeño (p < 0.05).")
+    if any(k in norm for k in ['objetivo general']):
+        return all_sec.get('obj_gen', f"Determinar el efecto de {' '.join(title.split()[:4])} sobre los indicadores de desempeño organizacional.")
+    if any(k in norm for k in ['objetivo especific', 'objetivos especificos']):
+        obj = all_sec.get('obj_esp', [])
+        return '\n'.join(f"OE{i+1}: {o}" for i, o in enumerate(obj[:3])) if obj else ''
+    if any(k in norm for k in ['limitacion', 'delimitacion', 'alcance']):
+        return all_sec.get('lim', f"El estudio se delimita geográficamente al ámbito de {rl or 'la institución evaluada'}, con una temporalidad de 12 meses.")
+    if any(k in norm for k in ['metodolog', 'capitulo ii', 'tipo de investigacion',
+                                'diseno', 'poblacion', 'muestra']):
+        return all_sec.get('cap2', _cap2(title, rl)).get('tipo', _cap2(title, rl)) if isinstance(all_sec.get('cap2'), dict) else all_sec.get('cap2', _cap2(title, rl))
+    if any(k in norm for k in ['resultado', 'capitulo iii', 'hallazgos']):
+        return all_sec.get('cap3', _cap3(title))
+    if any(k in norm for k in ['discusion', 'capitulo iv', 'interpretacion']):
+        return all_sec.get('cap4', _cap4(title))
+    if any(k in norm for k in ['conclusion', 'recomendacion', 'capitulo v']):
+        return all_sec.get('cap5', _cap5(title))
+    if any(k in norm for k in ['resumen', 'abstract']):
+        return all_sec.get('resumen', _resumen(title, rl))
+    if any(k in norm for k in ['introducc', 'capitulo i']):
+        return _rp(title, rl)
+    # Contenido genérico para secciones no reconocidas
+    kw = ' '.join(title.split()[:4])
+    return (
+        f"En el marco de la investigación sobre {kw}, esta sección desarrolla los aspectos "
+        f"correspondientes a {section_title}, tomando como referencia los lineamientos "
+        f"establecidos por las normas académicas vigentes y los estándares internacionales "
+        f"de investigación científica. El análisis se sustenta en la revisión sistemática de "
+        f"la literatura especializada y en los datos primarios recolectados durante el trabajo de campo."
+    )
+
+
+# ── PDF: Proyecto de Tesis ─────────────────────────────────────────────────────
+
+def _build_pdf_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path: str = None) -> str:
+    _register_fonts()
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    path = f"{OUTPUT_DIR}/doc_{uid}.pdf"
+
+    doc = SimpleDocTemplate(
+        path, pagesize=A4,
+        leftMargin=ML, rightMargin=MR, topMargin=MT, bottomMargin=MB,
+    )
+    s = _s()
+    story = []
+
+    def sp(h=10): story.append(Spacer(1, h))
+    def p(text, style='n'): story.append(Paragraph(str(text), s[style]))
+    def br(): story.append(PageBreak())
+    def tbl(headers, rows, widths=None): story.append(_make_table(headers, rows, widths))
+
+    # ── CARÁTULA
+    sp(30)
+    if logo_path and os.path.exists(logo_path):
+        try:
+            from reportlab.platypus import Image as _RLImg
+            lg = _RLImg(logo_path, width=4*cm, height=4*cm)
+            lg.hAlign = 'CENTER'
+            story.append(lg)
+            sp(14)
+        except Exception:
+            sp(26)
+    else:
+        sp(30)
+
+    p("UNIVERSIDAD NACIONAL DE TRUJILLO", 'h1')
+    p("FACULTAD DE INGENIERÍA", 'c')
+    p("ESCUELA PROFESIONAL DE INGENIERÍA DE SISTEMAS", 'c')
+    sp(40)
+    story.append(HRFlowable(width='100%', thickness=2, color=colors.HexColor('#1e3a5f')))
+    sp(20)
+    p(data['title'].upper(), 'h1')
+    sp(20)
+    story.append(HRFlowable(width='100%', thickness=2, color=colors.HexColor('#1e3a5f')))
+    sp(40)
+    p("PROYECTO DE TESIS PARA OPTAR EL TÍTULO PROFESIONAL DE INGENIERO DE SISTEMAS", 'c')
+    sp(30)
+    authors = data.get('authors', ['Autor'])
+    if isinstance(authors, str):
+        authors = [a.strip() for a in authors.split(',')]
+    p("AUTOR(ES):", 'c')
+    for a in authors:
+        p(a.upper(), 'c')
+    sp(16)
+    p("ASESOR:", 'c')
+    p(data.get('advisor', '').upper(), 'c')
+    sp(16)
+    p("LÍNEA DE INVESTIGACIÓN:", 'c')
+    p(data.get('research_line', '').upper(), 'c')
+    sp(40)
+    p(f"{data.get('city', 'Trujillo').upper()} — PERÚ", 'c')
+    p(str(data.get('year', datetime.now().year)), 'c')
+    br()
+
+    # ── RESUMEN
+    p("RESUMEN", 'h1')
+    sp(10)
+    p(sec.get('resumen', ''), 'n')
+    sp(8)
+    p(f"<b>Palabras clave:</b> investigación, metodología, tecnología, innovación, {data['title'].split()[0].lower()}", 'n')
+    br()
+
+    p("ABSTRACT", 'h1')
+    sp(10)
+    p(sec.get('abstract', ''), 'n')
+    sp(8)
+    p(f"<b>Keywords:</b> research, methodology, technology, innovation, {data['title'].split()[0].lower()}", 'n')
+    br()
+
+    # ── CAPÍTULO I
+    p("CAPÍTULO I: EL PROBLEMA DE INVESTIGACIÓN", 'h1')
+    sp(10)
+    p("1.1 Realidad Problemática", 'h2')
+    p(sec.get('rp', ''), 'n')
+    sp(8)
+    p("1.2 Antecedentes", 'h2')
+    p(sec.get('ant', ''), 'n')
+    sp(8)
+    p("1.3 Marco Teórico", 'h2')
+    mt_val = sec.get('mt', '')
+    if isinstance(mt_val, dict):
+        for k, v in mt_val.items():
+            p(str(v), 'n')
+    else:
+        p(str(mt_val), 'n')
+    sp(8)
+    p("1.4 Justificación", 'h2')
+    just_val = sec.get('just', '')
+    if isinstance(just_val, dict):
+        for v in just_val.values():
+            p(str(v), 'n')
+    else:
+        p(str(just_val), 'n')
+    sp(8)
+    p("1.5 Planteamiento del Problema", 'h2')
+    p(sec.get('prob', ''), 'n')
+    sp(8)
+    p("1.6 Hipótesis", 'h2')
+    p(sec.get('hip', ''), 'n')
+    sp(8)
+    p("1.7 Objetivos", 'h2')
+    p("1.7.1 Objetivo General", 'h3')
+    p(sec.get('obj_gen', ''), 'n')
+    p("1.7.2 Objetivos Específicos", 'h3')
+    for i, o in enumerate(sec.get('obj_esp', [])[:3], 1):
+        p(f"OE{i}: {o}", 'n')
+    sp(8)
+    p("1.8 Limitaciones", 'h2')
+    lim_val = sec.get('lim', '')
+    if isinstance(lim_val, list):
+        for l in lim_val:
+            p(str(l), 'n')
+    else:
+        p(str(lim_val), 'n')
+    br()
+
+    # ── CAPÍTULO II: METODOLOGÍA
+    p("CAPÍTULO II: MARCO METODOLÓGICO", 'h1')
+    sp(10)
+    p(sec.get('cap2_proyecto', ''), 'n')
+    sp(8)
+    p("2.1 Variables y Operacionalización", 'h2')
+    sp(6)
+    op_rows = sec.get('operacionalizacion_rows', _tabla_operacionalizacion(data['title']))
+    tbl(
+        ["Variable", "Definición conceptual", "Dimensión", "Indicador", "Escala", "Instrumento"],
+        op_rows,
+        [2.5*cm, 3*cm, 2.5*cm, 3*cm, 1.8*cm, 3*cm],
+    )
+    br()
+
+    # ── CAPÍTULO III: ASPECTOS ADMINISTRATIVOS
+    p("CAPÍTULO III: ASPECTOS ADMINISTRATIVOS", 'h1')
+    sp(10)
+    p("3.1 Cronograma de Actividades", 'h2')
+    sp(6)
+    cron_rows = sec.get('cronograma_rows', _tabla_cronograma(data['title']))
+    tbl(
+        ["Actividad", "Mes 1", "Mes 2", "Mes 3", "Mes 4", "Mes 5", "Mes 6"],
+        cron_rows,
+        [7*cm, 1.5*cm, 1.5*cm, 1.5*cm, 1.5*cm, 1.5*cm, 1.5*cm],
+    )
+    sp(16)
+    p("3.2 Presupuesto", 'h2')
+    sp(6)
+    pres_rows = sec.get('presupuesto_rows', _tabla_presupuesto(data['title']))
+    tbl(
+        ["Descripción", "Cantidad/Tiempo", "Precio unitario", "Total"],
+        pres_rows,
+        [7*cm, 3.5*cm, 3.5*cm, 3*cm],
+    )
+    br()
+
+    # ── REFERENCIAS
+    p("REFERENCIAS BIBLIOGRÁFICAS", 'h1')
+    sp(10)
+    for ref in refs[:25]:
+        p(ref, 'ref')
+    br()
+
+    # ── ANEXOS
+    p("ANEXOS", 'h1')
+    sp(10)
+    p("Anexo 1: Matriz de Consistencia", 'h2')
+    sp(6)
+    cons_rows = sec.get('consistencia_rows', _tabla_consistencia(data['title'], sec.get('obj_esp', [])))
+    tbl(
+        ["Problema", "Objetivo específico", "Hipótesis", "Variable", "Indicador", "Instrumento", "Diseño"],
+        cons_rows,
+        [2.5*cm, 2.5*cm, 2.5*cm, 2*cm, 2.5*cm, 2.5*cm, 2*cm],
+    )
+    sp(20)
+    p("Anexo 2: Declaración Jurada de Autoría", 'h2')
+    sp(10)
+    p(
+        f"Yo/Nosotros, {', '.join(authors)}, declaro/declaramos bajo juramento que el proyecto "
+        f"de tesis titulado «{data['title']}» es de mi/nuestra autoría, no ha sido plagiado "
+        f"ni publicado anteriormente.", 'n'
+    )
+    sp(20)
+    for a in authors:
+        p("_______________________________", 'c')
+        p(a.upper(), 'c')
+        sp(10)
+
+    doc.build(story)
+    return path
+
+
+# ── DOCX: Proyecto de Tesis ────────────────────────────────────────────────────
+
+def _build_docx_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path: str = None) -> str:
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    path = f"{OUTPUT_DIR}/doc_{uid}.docx"
+
+    doc = _DocxDoc()
+    _set_docx_margins(doc)
+
+    authors = data.get('authors', 'Autor')
+    if isinstance(authors, str):
+        authors = [a.strip() for a in authors.split(',')]
+
+    def add_h(text, level=1):
+        h = doc.add_heading(text, level=level)
+        for run in h.runs:
+            run.font.color.rgb = RGBColor(0x1e, 0x3a, 0x5f)
+
+    def add_para(text, bold=False, align=WD_ALIGN_PARAGRAPH.JUSTIFY):
+        para = doc.add_paragraph()
+        para.paragraph_format.line_spacing = _Pt(20)
+        run = para.add_run(str(text))
+        run.font.name = 'Arial Narrow'
+        run.font.size = _Pt(12)
+        run.bold = bold
+        para.alignment = align
+
+    def add_table_docx(headers, rows):
+        if not rows:
+            return
+        t = doc.add_table(rows=1 + len(rows), cols=len(headers))
+        t.style = 'Table Grid'
+        for i, h in enumerate(headers):
+            cell = t.rows[0].cells[i]
+            cell.text = h
+            for run in cell.paragraphs[0].runs:
+                run.bold = True
+                run.font.size = _Pt(9)
+        for r_idx, row in enumerate(rows):
+            for c_idx, val in enumerate(row[:len(headers)]):
+                t.rows[r_idx + 1].cells[c_idx].text = str(val)
+
+    # Carátula
+    add_para("UNIVERSIDAD NACIONAL DE TRUJILLO", bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_para("FACULTAD DE INGENIERÍA", align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_para("ESCUELA PROFESIONAL DE INGENIERÍA DE SISTEMAS", align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_para("")
+    add_para("PROYECTO DE TESIS PARA OPTAR EL TÍTULO PROFESIONAL\nDE INGENIERO DE SISTEMAS", bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_para("")
+    add_para(data['title'].upper(), bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_para("")
+    add_para("AUTOR(ES):", bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
+    for a in authors:
+        add_para(a.upper(), align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_para(f"ASESOR: {data.get('advisor','').upper()}", align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_para(f"LÍNEA DE INVESTIGACIÓN: {data.get('research_line','').upper()}", align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_para(f"{data.get('city','Trujillo').upper()} — PERÚ   {data.get('year', datetime.now().year)}", align=WD_ALIGN_PARAGRAPH.CENTER)
+    doc.add_page_break()
+
+    # Resumen
+    add_h("RESUMEN", 1)
+    add_para(sec.get('resumen', ''))
+    doc.add_page_break()
+
+    # Abstract
+    add_h("ABSTRACT", 1)
+    add_para(sec.get('abstract', ''))
+    doc.add_page_break()
+
+    # Cap I
+    add_h("CAPÍTULO I: EL PROBLEMA DE INVESTIGACIÓN", 1)
+    for subh, key in [
+        ("1.1 Realidad Problemática", 'rp'),
+        ("1.2 Antecedentes", 'ant'),
+        ("1.4 Justificación", 'just'),
+    ]:
+        add_h(subh, 2)
+        val = sec.get(key, '')
+        if isinstance(val, dict):
+            for v in val.values():
+                add_para(str(v))
+        elif isinstance(val, list):
+            for v in val:
+                add_para(str(v))
+        else:
+            add_para(str(val))
+
+    add_h("1.3 Marco Teórico", 2)
+    mt_val = sec.get('mt', '')
+    if isinstance(mt_val, dict):
+        for v in mt_val.values():
+            add_para(str(v))
+    else:
+        add_para(str(mt_val))
+
+    add_h("1.5 Planteamiento del Problema", 2)
+    add_para(sec.get('prob', ''))
+    add_h("1.6 Hipótesis", 2)
+    add_para(sec.get('hip', ''))
+    add_h("1.7.1 Objetivo General", 3)
+    add_para(sec.get('obj_gen', ''))
+    add_h("1.7.2 Objetivos Específicos", 3)
+    for i, o in enumerate(sec.get('obj_esp', [])[:3], 1):
+        add_para(f"OE{i}: {o}")
+    add_h("1.8 Limitaciones", 2)
+    lim_val = sec.get('lim', '')
+    if isinstance(lim_val, list):
+        for l in lim_val:
+            add_para(str(l))
+    else:
+        add_para(str(lim_val))
+    doc.add_page_break()
+
+    # Cap II
+    add_h("CAPÍTULO II: MARCO METODOLÓGICO", 1)
+    add_para(sec.get('cap2_proyecto', ''))
+    add_h("2.1 Operacionalización de Variables", 2)
+    op_rows = sec.get('operacionalizacion_rows', _tabla_operacionalizacion(data['title']))
+    add_table_docx(
+        ["Variable", "Definición conceptual", "Dimensión", "Indicador", "Escala", "Instrumento"],
+        op_rows,
+    )
+    doc.add_page_break()
+
+    # Cap III
+    add_h("CAPÍTULO III: ASPECTOS ADMINISTRATIVOS", 1)
+    add_h("3.1 Cronograma de Actividades", 2)
+    cron_rows = sec.get('cronograma_rows', _tabla_cronograma(data['title']))
+    add_table_docx(
+        ["Actividad", "Mes 1", "Mes 2", "Mes 3", "Mes 4", "Mes 5", "Mes 6"],
+        cron_rows,
+    )
+    add_h("3.2 Presupuesto", 2)
+    pres_rows = sec.get('presupuesto_rows', _tabla_presupuesto(data['title']))
+    add_table_docx(["Descripción", "Cantidad/Tiempo", "Precio unitario", "Total"], pres_rows)
+    doc.add_page_break()
+
+    # Referencias
+    add_h("REFERENCIAS BIBLIOGRÁFICAS", 1)
+    for ref in refs[:25]:
+        add_para(ref)
+    doc.add_page_break()
+
+    # Anexos
+    add_h("ANEXOS", 1)
+    add_h("Anexo 1: Matriz de Consistencia", 2)
+    cons_rows = sec.get('consistencia_rows', _tabla_consistencia(data['title'], sec.get('obj_esp', [])))
+    add_table_docx(
+        ["Problema", "Objetivo esp.", "Hipótesis", "Variable", "Indicador", "Instrumento", "Diseño"],
+        cons_rows,
+    )
+    add_h("Anexo 2: Declaración Jurada de Autoría", 2)
+    add_para(
+        f"Yo/Nosotros, {', '.join(authors)}, declaro/declaramos bajo juramento que el proyecto "
+        f"«{data['title']}» es de nuestra autoría y no ha sido plagiado."
+    )
+
+    doc.save(path)
+    return path
+
+
+# ── PDF: Artículo de Investigación ────────────────────────────────────────────
+
+def _build_pdf_articulo(data: dict, sec: dict, refs: list, uid: str, logo_path: str = None) -> str:
+    _register_fonts()
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    path = f"{OUTPUT_DIR}/doc_{uid}.pdf"
+
+    doc = SimpleDocTemplate(
+        path, pagesize=A4,
+        leftMargin=ML, rightMargin=MR, topMargin=MT, bottomMargin=MB,
+    )
+    s = _s()
+    story = []
+
+    def sp(h=10): story.append(Spacer(1, h))
+    def p(text, style='n'): story.append(Paragraph(str(text), s[style]))
+    def br(): story.append(PageBreak())
+
+    authors = data.get('authors', 'Autor')
+    if isinstance(authors, str):
+        authors = [a.strip() for a in authors.split(',')]
+
+    # Encabezado del artículo
+    sp(20)
+    p(data['title'], 'h1')
+    sp(10)
+    p(' · '.join(authors), 'c')
+    p(f"Universidad Nacional de Trujillo · {data.get('city', 'Trujillo')}", 'c')
+    sp(6)
+    p(f"Correo: investigacion@unitru.edu.pe · Año: {data.get('year', datetime.now().year)}", 'c')
+    story.append(HRFlowable(width='100%', thickness=1, color=colors.HexColor('#1e3a5f')))
+    sp(10)
+
+    # Resumen
+    p("Resumen", 'h2')
+    p(sec.get('resumen', ''), 'n')
+    sp(6)
+    kw_list = ' '.join(data['title'].split()[:5]).lower()
+    p(f"<b>Palabras clave:</b> {kw_list}, investigación cuantitativa, metodología aplicada.", 'n')
+    sp(12)
+    story.append(HRFlowable(width='100%', thickness=0.5, color=colors.HexColor('#c0c8d8')))
+    sp(12)
+
+    # Abstract
+    p("Abstract", 'h2')
+    p(sec.get('abstract', ''), 'n')
+    sp(6)
+    p(f"<b>Keywords:</b> {kw_list}, quantitative research, applied methodology.", 'n')
+    br()
+
+    # Secciones del artículo
+    sections_map = [
+        ("I. INTRODUCCIÓN", 'introduction'),
+        ("II. MATERIALES Y MÉTODOS", 'methodology'),
+        ("III. RESULTADOS", 'results'),
+        ("IV. DISCUSIÓN", 'discussion'),
+        ("V. CONCLUSIONES", 'conclusions'),
+    ]
+    for heading, key in sections_map:
+        p(heading, 'h1')
+        sp(6)
+        content = sec.get(key, '')
+        if isinstance(content, (list, dict)):
+            p(str(content), 'n')
+        else:
+            p(str(content), 'n')
+        sp(12)
+
+    br()
+
+    # Referencias
+    p("REFERENCIAS", 'h1')
+    sp(10)
+    for ref in refs[:20]:
+        p(ref, 'ref')
+
+    doc.build(story)
+    return path
+
+
+# ── DOCX: Artículo de Investigación ───────────────────────────────────────────
+
+def _build_docx_articulo(data: dict, sec: dict, refs: list, uid: str, logo_path: str = None) -> str:
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    path = f"{OUTPUT_DIR}/doc_{uid}.docx"
+
+    doc = _DocxDoc()
+    _set_docx_margins(doc)
+
+    authors = data.get('authors', 'Autor')
+    if isinstance(authors, str):
+        authors = [a.strip() for a in authors.split(',')]
+
+    def add_h(text, level=1):
+        h = doc.add_heading(text, level=level)
+        for run in h.runs:
+            run.font.color.rgb = RGBColor(0x1e, 0x3a, 0x5f)
+
+    def add_para(text, bold=False, align=WD_ALIGN_PARAGRAPH.JUSTIFY):
+        para = doc.add_paragraph()
+        para.paragraph_format.line_spacing = _Pt(20)
+        run = para.add_run(str(text))
+        run.font.name = 'Arial Narrow'
+        run.font.size = _Pt(12)
+        run.bold = bold
+        para.alignment = align
+
+    add_h(data['title'], 1)
+    add_para(' · '.join(authors), align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_para(f"Universidad Nacional de Trujillo · {data.get('city','Trujillo')}", align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_para("")
+
+    add_h("Resumen", 2)
+    add_para(sec.get('resumen', ''))
+    kw_list = ' '.join(data['title'].split()[:5]).lower()
+    add_para(f"Palabras clave: {kw_list}, investigación cuantitativa.")
+
+    add_h("Abstract", 2)
+    add_para(sec.get('abstract', ''))
+    add_para(f"Keywords: {kw_list}, quantitative research.")
+
+    doc.add_page_break()
+
+    for heading, key in [
+        ("I. INTRODUCCIÓN", 'introduction'),
+        ("II. MATERIALES Y MÉTODOS", 'methodology'),
+        ("III. RESULTADOS", 'results'),
+        ("IV. DISCUSIÓN", 'discussion'),
+        ("V. CONCLUSIONES", 'conclusions'),
+    ]:
+        add_h(heading, 1)
+        content = sec.get(key, '')
+        add_para(str(content) if not isinstance(content, str) else content)
+
+    doc.add_page_break()
+
+    add_h("REFERENCIAS", 1)
+    for ref in refs[:20]:
+        add_para(ref)
+
+    doc.save(path)
+    return path
+
+
+# ── Helper DOCX: márgenes ─────────────────────────────────────────────────────
+
+def _set_docx_margins(doc):
+    from docx.oxml import OxmlElement
+    from docx.oxml.ns import qn
+    section = doc.sections[0]
+    section.left_margin   = _Cm(3)
+    section.right_margin  = _Cm(2.5)
+    section.top_margin    = _Cm(2.5)
+    section.bottom_margin = _Cm(2.5)
+
+
+# ── PDF/DOCX basado en plantilla ──────────────────────────────────────────────
+
+def _build_pdf_from_template(data: dict, template_structure: dict, all_sec: dict,
+                              refs: list, uid: str, logo_path: str = None) -> str:
+    """Construye un PDF siguiendo la estructura de una plantilla analizada."""
+    _register_fonts()
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    path = f"{OUTPUT_DIR}/doc_{uid}.pdf"
+
+    doc = SimpleDocTemplate(
+        path, pagesize=A4,
+        leftMargin=ML, rightMargin=MR, topMargin=MT, bottomMargin=MB,
+    )
+    s = _s()
+    story = []
+
+    def sp(h=10): story.append(Spacer(1, h))
+    def p(text, style='n'): story.append(Paragraph(str(text)[:8000], s[style]))
+    def br(): story.append(PageBreak())
+    def tbl(headers, rows, widths=None): story.append(_make_table(headers, rows, widths))
+
+    rl = data.get('research_line', '')
+    title = data['title']
+    table_idx = 0
+    tables_in_template = template_structure.get('tables', [])
+
+    # Carátula siempre
+    sp(30)
+    if logo_path and os.path.exists(logo_path):
+        try:
+            from reportlab.platypus import Image as _RLImg
+            lg = _RLImg(logo_path, width=4*cm, height=4*cm)
+            lg.hAlign = 'CENTER'
+            story.append(lg)
+            sp(14)
+        except Exception:
+            sp(26)
+    else:
+        sp(30)
+    p("UNIVERSIDAD NACIONAL DE TRUJILLO", 'h1')
+    p("FACULTAD DE INGENIERÍA", 'c')
+    p("ESCUELA PROFESIONAL DE INGENIERÍA DE SISTEMAS", 'c')
+    sp(30)
+    story.append(HRFlowable(width='100%', thickness=2, color=colors.HexColor('#1e3a5f')))
+    sp(16)
+    p(title.upper(), 'h1')
+    sp(16)
+    story.append(HRFlowable(width='100%', thickness=2, color=colors.HexColor('#1e3a5f')))
+    sp(30)
+    authors = data.get('authors', 'Autor')
+    if isinstance(authors, str):
+        authors = [a.strip() for a in authors.split(',')]
+    for a in authors:
+        p(a.upper(), 'c')
+    p(f"Asesor: {data.get('advisor','')}", 'c')
+    p(f"{data.get('city','Trujillo').upper()} — PERÚ   {data.get('year', datetime.now().year)}", 'c')
+    br()
+
+    # Recorrer secciones de la plantilla
+    sections = template_structure.get('sections', [])
+    if not sections:
+        # Sin secciones detectadas: generar contenido estándar según tipo
+        p("CONTENIDO PRINCIPAL", 'h1')
+        p(_rp(title, rl), 'n')
+        p(_ant(title), 'n')
+    else:
+        prev_level = 0
+        for sec_item in sections:
+            level = sec_item.get('level', 2)
+            sec_title = sec_item.get('title', '')
+            if not sec_title:
+                continue
+
+            style_key = 'h1' if level == 1 else ('h2' if level == 2 else 'h3')
+            p(sec_title, style_key)
+            sp(6)
+
+            content = _map_section_to_content(sec_title, title, rl, all_sec)
+            if content:
+                if isinstance(content, list):
+                    for item in content:
+                        p(str(item), 'n')
+                else:
+                    p(str(content), 'n')
+            sp(10)
+
+            # Insertar tablas de la plantilla cuando correspondan
+            norm_title = sec_title.lower()
+            for acc in ['á','é','í','ó','ú']:
+                norm_title = norm_title.replace(acc, 'aeiou'['áéíóú'.index(acc)])
+
+            if any(k in norm_title for k in ['cronograma', 'actividade']):
+                cron_rows = all_sec.get('cronograma_rows', _tabla_cronograma(title))
+                tbl(["Actividad", "Mes 1", "Mes 2", "Mes 3", "Mes 4", "Mes 5", "Mes 6"], cron_rows,
+                    [7*cm, 1.5*cm, 1.5*cm, 1.5*cm, 1.5*cm, 1.5*cm, 1.5*cm])
+                sp(12)
+            elif any(k in norm_title for k in ['presupuesto', 'recursos', 'financiamiento']):
+                pres_rows = all_sec.get('presupuesto_rows', _tabla_presupuesto(title))
+                tbl(["Descripción", "Cantidad", "Precio unit.", "Total"], pres_rows,
+                    [7*cm, 3*cm, 3.5*cm, 3*cm])
+                sp(12)
+            elif any(k in norm_title for k in ['operacionaliz', 'operacionalizacion']):
+                op_rows = all_sec.get('operacionalizacion_rows', _tabla_operacionalizacion(title))
+                tbl(["Variable", "Definición", "Dimensión", "Indicador", "Escala", "Instrumento"], op_rows,
+                    [2.5*cm, 3*cm, 2.5*cm, 3*cm, 1.8*cm, 2.7*cm])
+                sp(12)
+            elif any(k in norm_title for k in ['consistencia', 'matriz']):
+                cons_rows = all_sec.get('consistencia_rows', _tabla_consistencia(title, all_sec.get('obj_esp', [])))
+                tbl(["Problema", "Objetivo", "Hipótesis", "Variable", "Indicador", "Instrumento", "Diseño"], cons_rows,
+                    [2.5*cm, 2.5*cm, 2.5*cm, 2*cm, 2.5*cm, 2.5*cm, 1.5*cm])
+                sp(12)
+            elif table_idx < len(tables_in_template):
+                tpl_table = tables_in_template[table_idx]
+                tpl_type  = tpl_table.get('type', 'generic')
+                if tpl_type == 'cronograma':
+                    cron_rows = _tabla_cronograma(title)
+                    tbl(["Actividad", "Mes 1", "Mes 2", "Mes 3", "Mes 4", "Mes 5", "Mes 6"], cron_rows)
+                elif tpl_type == 'presupuesto':
+                    pres_rows = _tabla_presupuesto(title)
+                    tbl(["Descripción", "Cantidad", "Precio unit.", "Total"], pres_rows)
+                elif tpl_type == 'operacionalizacion':
+                    op_rows = _tabla_operacionalizacion(title)
+                    tbl(["Variable", "Definición", "Dimensión", "Indicador", "Escala", "Instrumento"], op_rows)
+                elif tpl_type == 'consistencia':
+                    cons_rows = _tabla_consistencia(title, all_sec.get('obj_esp', []))
+                    tbl(["Problema", "Objetivo", "Hipótesis", "Variable", "Indicador", "Instrumento", "Diseño"], cons_rows)
+                table_idx += 1
+
+            if level == 1:
+                br()
+
+    # Referencias siempre al final
+    p("REFERENCIAS BIBLIOGRÁFICAS", 'h1')
+    sp(10)
+    for ref in refs[:25]:
+        p(ref, 'ref')
+
+    doc.build(story)
+    return path
+
+
+def _build_docx_from_template(data: dict, template_structure: dict, all_sec: dict,
+                               refs: list, uid: str, logo_path: str = None) -> str:
+    """Construye un DOCX siguiendo la estructura de una plantilla analizada."""
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    path = f"{OUTPUT_DIR}/doc_{uid}.docx"
+
+    doc = _DocxDoc()
+    _set_docx_margins(doc)
+
+    title = data['title']
+    rl    = data.get('research_line', '')
+
+    authors = data.get('authors', 'Autor')
+    if isinstance(authors, str):
+        authors = [a.strip() for a in authors.split(',')]
+
+    def add_h(text, level=1):
+        h = doc.add_heading(str(text), level=level)
+        for run in h.runs:
+            run.font.color.rgb = RGBColor(0x1e, 0x3a, 0x5f)
+
+    def add_para(text, bold=False, align=WD_ALIGN_PARAGRAPH.JUSTIFY):
+        para = doc.add_paragraph()
+        para.paragraph_format.line_spacing = _Pt(20)
+        run = para.add_run(str(text)[:8000])
+        run.font.name = 'Arial Narrow'
+        run.font.size = _Pt(12)
+        run.bold = bold
+        para.alignment = align
+
+    def add_table_docx(headers, rows):
+        if not rows:
+            return
+        t = doc.add_table(rows=1 + len(rows), cols=len(headers))
+        t.style = 'Table Grid'
+        for i, h in enumerate(headers):
+            cell = t.rows[0].cells[i]
+            cell.text = h
+            for run in cell.paragraphs[0].runs:
+                run.bold = True
+                run.font.size = _Pt(9)
+        for r_idx, row in enumerate(rows):
+            for c_idx, val in enumerate(row[:len(headers)]):
+                t.rows[r_idx + 1].cells[c_idx].text = str(val)
+
+    # Carátula
+    add_para(title.upper(), bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_para(' · '.join(authors), align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_para(f"Asesor: {data.get('advisor','')}", align=WD_ALIGN_PARAGRAPH.CENTER)
+    add_para(f"{data.get('city','Trujillo').upper()} — {data.get('year', datetime.now().year)}", align=WD_ALIGN_PARAGRAPH.CENTER)
+    doc.add_page_break()
+
+    sections = template_structure.get('sections', [])
+    if not sections:
+        add_h("CONTENIDO", 1)
+        add_para(_rp(title, rl))
+        add_para(_ant(title))
+    else:
+        for sec_item in sections:
+            level = sec_item.get('level', 2)
+            sec_title = sec_item.get('title', '')
+            if not sec_title:
+                continue
+
+            add_h(sec_title, min(level, 3))
+
+            content = _map_section_to_content(sec_title, title, rl, all_sec)
+            if content:
+                if isinstance(content, list):
+                    for item in content:
+                        add_para(str(item))
+                else:
+                    add_para(str(content))
+
+            norm_title = sec_title.lower()
+            for acc in ['á','é','í','ó','ú']:
+                norm_title = norm_title.replace(acc, 'aeiou'['áéíóú'.index(acc)])
+
+            if any(k in norm_title for k in ['cronograma', 'actividade']):
+                add_table_docx(
+                    ["Actividad", "Mes 1", "Mes 2", "Mes 3", "Mes 4", "Mes 5", "Mes 6"],
+                    all_sec.get('cronograma_rows', _tabla_cronograma(title)),
+                )
+            elif any(k in norm_title for k in ['presupuesto', 'recursos']):
+                add_table_docx(
+                    ["Descripción", "Cantidad", "Precio unit.", "Total"],
+                    all_sec.get('presupuesto_rows', _tabla_presupuesto(title)),
+                )
+            elif any(k in norm_title for k in ['operacionaliz']):
+                add_table_docx(
+                    ["Variable", "Definición", "Dimensión", "Indicador", "Escala", "Instrumento"],
+                    all_sec.get('operacionalizacion_rows', _tabla_operacionalizacion(title)),
+                )
+            elif any(k in norm_title for k in ['consistencia', 'matriz']):
+                add_table_docx(
+                    ["Problema", "Objetivo", "Hipótesis", "Variable", "Indicador", "Instrumento", "Diseño"],
+                    all_sec.get('consistencia_rows', _tabla_consistencia(title, all_sec.get('obj_esp', []))),
+                )
+
+            if level == 1:
+                doc.add_page_break()
+
+    # Referencias
+    add_h("REFERENCIAS BIBLIOGRÁFICAS", 1)
+    for ref in refs[:25]:
+        add_para(ref)
+
+    doc.save(path)
+    return path
+
+
+# ── API pública extendida ─────────────────────────────────────────────────────
+
+def generate_document(data: dict) -> dict:
+    """
+    Genera un documento académico completo (PDF + DOCX).
+
+    data keys adicionales respecto a generate_thesis:
+        doc_type          str  — "tesis" | "proyecto_tesis" | "articulo"
+        template_structure dict — resultado de template_analyzer.analyze_template() (opcional)
+    """
+    import base64, tempfile
+
+    uid   = uuid.uuid4().hex[:10]
+    title = data.get('title', 'documento')
+    rl    = data.get('research_line', '')
+    doc_type = data.get('doc_type', 'tesis')
+    template_structure = data.get('template_structure', None)
+
+    refs = _gen_references(title)
+
+    # Decodificar logo si viene en base64
+    logo_path = None
+    if data.get('logo_data'):
+        try:
+            raw = data['logo_data']
+            b64 = raw.split(',', 1)[-1]
+            logo_bytes = base64.b64decode(b64)
+            ext = '.jpg' if ('jpeg' in raw or 'jpg' in raw) else '.png'
+            os.makedirs(OUTPUT_DIR, exist_ok=True)
+            tmp = tempfile.NamedTemporaryFile(
+                delete=False, suffix=ext, dir=OUTPUT_DIR, prefix='logo_'
+            )
+            tmp.write(logo_bytes)
+            tmp.close()
+            logo_path = tmp.name
+        except Exception as e:
+            print(f"[generate_document] logo decode error: {e}")
+
+    # Jurado por defecto
+    if not data.get('jurado'):
+        rng = random.Random(abs(hash(title)) % 99999)
+        prefixes  = ['Dr.', 'Mg.', 'Dr.']
+        lastnames = ['García López', 'Rodríguez Sánchez', 'Martínez Torres',
+                     'Pérez Castillo', 'Flores Ramírez', 'Soto Herrera']
+        data['jurado'] = [f"{prefixes[i]} {rng.choice(lastnames)}" for i in range(3)]
+
+    source = 'template'
+
+    # Generar contenido según tipo de documento
+    if doc_type == 'proyecto_tesis':
+        sec = _content_proyecto_tesis(title, rl)
+    elif doc_type == 'articulo':
+        sec = _content_articulo(title, rl)
+    else:
+        # Tesis: flujo existente
+        ai_content = _gen_openai(data)
+        if ai_content:
+            sec = {
+                'rp':      ai_content.get('rp',      _rp(title, rl)),
+                'ant':     ai_content.get('ant',     _ant(title)),
+                'mt':      ai_content.get('mt',      _mt(title, rl)),
+                'just':    ai_content.get('just',    _just(title)),
+                'prob':    ai_content.get('prob',    ''),
+                'hip':     ai_content.get('hip',     ''),
+                'obj_gen': ai_content.get('obj_gen', ''),
+                'obj_esp': ai_content.get('obj_esp', []),
+                'lim':     ai_content.get('lim',     ''),
+            }
+            source = 'openai'
+        else:
+            sec = _intro_text(data, refs)
+        sec['resumen']  = _resumen(title, rl)
+        sec['abstract'] = _abstract(title, rl)
+        sec['cap2']     = _cap2(title, rl)
+        sec['cap3']     = _cap3(title)
+        sec['cap4']     = _cap4(title)
+        sec['cap5']     = _cap5(title)
+
+    # Construir PDF y DOCX
+    if template_structure and template_structure.get('sections'):
+        # Con plantilla: respetar su estructura
+        pdf_path  = _build_pdf_from_template(data, template_structure, sec, refs, uid, logo_path)
+        docx_path = _build_docx_from_template(data, template_structure, sec, refs, uid, logo_path)
+    elif doc_type == 'proyecto_tesis':
+        pdf_path  = _build_pdf_proyecto(data, sec, refs, uid, logo_path)
+        docx_path = _build_docx_proyecto(data, sec, refs, uid, logo_path)
+    elif doc_type == 'articulo':
+        pdf_path  = _build_pdf_articulo(data, sec, refs, uid, logo_path)
+        docx_path = _build_docx_articulo(data, sec, refs, uid, logo_path)
+    else:
+        pdf_path  = _build_pdf(data, sec, refs, uid, logo_path)
+        docx_path = _build_docx(data, sec, refs, uid, logo_path)
+
+    # Limpiar logo temporal
+    if logo_path and os.path.exists(logo_path):
+        try:
+            os.remove(logo_path)
+        except Exception:
+            pass
+
+    return {
+        'uid':       uid,
+        'pdf_file':  os.path.basename(pdf_path),
+        'docx_file': os.path.basename(docx_path),
+        'source':    source,
+        'doc_type':  doc_type,
+        'sections':  {k: (v[:200] + '...' if isinstance(v, str) and len(v) > 200 else v)
+                      for k, v in sec.items()
+                      if isinstance(v, (str, list)) and not k.endswith('_rows')},
+    }
