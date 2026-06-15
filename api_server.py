@@ -1,25 +1,95 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, Response
-from pydantic import BaseModel
-from typing import Optional
-import os, json, time
-import httpx
+import sys, os, json, time
+import traceback as _tb
 
-from modules.database import init_db, query, execute, log, hash_password, check_password, now
-from modules.document_processing import extract_text_from_upload
-from modules.ai_engine import local_agentic_analysis, agent_plan_for_document
-from modules.plagiarism import run_similarity_check
-from modules.citations import validate_citations
-from modules.reports import generate_review_pdf, generate_similarity_pdf, generate_ai_detection_pdf
-from modules.email_service import send_review_email, send_batch_review_email, send_test_email
-from modules.thesis_generator import generate_thesis, generate_document
-from modules.template_analyzer import analyze_template
-from modules.open_similarity import run_open_similarity
-from modules.ai_detector import run_ai_detection
+# ── redirigir stderr a stdout para que Render muestre los errores reales ──────
+try:
+    sys.stderr = sys.stdout
+except Exception:
+    pass
 
-init_db()
+print("[startup] Python", sys.version, flush=True)
+print("[startup] cwd:", os.getcwd(), flush=True)
+
+try:
+    from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.responses import FileResponse, Response
+    from pydantic import BaseModel
+    from typing import Optional
+    import httpx
+    print("[startup] fastapi/pydantic OK", flush=True)
+except Exception as _e:
+    print("[startup] ERROR fastapi:", _e, flush=True); _tb.print_exc(); sys.exit(1)
+
+try:
+    from modules.database import init_db, query, execute, log, hash_password, check_password, now
+    print("[startup] database OK", flush=True)
+except Exception as _e:
+    print("[startup] ERROR database:", _e, flush=True); _tb.print_exc(); sys.exit(1)
+
+try:
+    from modules.document_processing import extract_text_from_upload
+    print("[startup] document_processing OK", flush=True)
+except Exception as _e:
+    print("[startup] ERROR document_processing:", _e, flush=True); _tb.print_exc(); sys.exit(1)
+
+try:
+    from modules.ai_engine import local_agentic_analysis, agent_plan_for_document
+    print("[startup] ai_engine OK", flush=True)
+except Exception as _e:
+    print("[startup] ERROR ai_engine:", _e, flush=True); _tb.print_exc(); sys.exit(1)
+
+try:
+    from modules.plagiarism import run_similarity_check
+    from modules.citations import validate_citations
+    print("[startup] plagiarism/citations OK", flush=True)
+except Exception as _e:
+    print("[startup] ERROR plagiarism/citations:", _e, flush=True); _tb.print_exc(); sys.exit(1)
+
+try:
+    from modules.reports import generate_review_pdf, generate_similarity_pdf, generate_ai_detection_pdf
+    print("[startup] reports OK", flush=True)
+except Exception as _e:
+    print("[startup] ERROR reports:", _e, flush=True); _tb.print_exc(); sys.exit(1)
+
+try:
+    from modules.email_service import send_review_email, send_batch_review_email, send_test_email
+    print("[startup] email_service OK", flush=True)
+except Exception as _e:
+    print("[startup] ERROR email_service:", _e, flush=True); _tb.print_exc(); sys.exit(1)
+
+try:
+    from modules.thesis_generator import generate_thesis, generate_document
+    print("[startup] thesis_generator OK", flush=True)
+except Exception as _e:
+    print("[startup] ERROR thesis_generator:", _e, flush=True); _tb.print_exc(); sys.exit(1)
+
+try:
+    from modules.template_analyzer import analyze_template
+    print("[startup] template_analyzer OK", flush=True)
+except Exception as _e:
+    print("[startup] ERROR template_analyzer:", _e, flush=True); _tb.print_exc(); sys.exit(1)
+
+try:
+    from modules.open_similarity import run_open_similarity
+    print("[startup] open_similarity OK", flush=True)
+except Exception as _e:
+    print("[startup] ERROR open_similarity:", _e, flush=True); _tb.print_exc(); sys.exit(1)
+
+try:
+    from modules.ai_detector import run_ai_detection
+    print("[startup] ai_detector OK", flush=True)
+except Exception as _e:
+    print("[startup] ERROR ai_detector:", _e, flush=True); _tb.print_exc(); sys.exit(1)
+
+try:
+    init_db()
+    print("[startup] init_db OK", flush=True)
+except Exception as _e:
+    print("[startup] ERROR init_db:", _e, flush=True); _tb.print_exc()
+
 os.makedirs("data/uploads", exist_ok=True)
+print("[startup] data dirs OK", flush=True)
 
 app = FastAPI(
     title="ThesisReview API",
