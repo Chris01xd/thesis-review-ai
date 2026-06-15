@@ -2597,51 +2597,171 @@ def _content_articulo(title: str, rl: str) -> dict:
 
 def _map_section_to_content(section_title: str, title: str, rl: str,
                              all_sec: dict) -> str:
-    """Devuelve contenido textual para una sección de plantilla dado su título."""
+    """
+    Devuelve contenido para cualquier sección de plantilla dado su título.
+    Retorna '' para secciones que no llevan cuerpo de texto (índices, portada, etc.).
+    """
     norm = section_title.lower()
     for c in 'áéíóú':
         norm = norm.replace(c, 'aeiou'['áéíóú'.index(c)])
 
-    if any(k in norm for k in ['realidad problem', 'situacion problem', 'contexto']):
+    kw4 = ' '.join(title.split()[:4])
+
+    # ── Secciones sin cuerpo de texto (skip) ─────────────────────────────────
+    skip_keys = [
+        'indice general', 'tabla de contenido', 'indice de contenido',
+        'lista de figuras', 'lista de tablas', 'indice de tablas', 'indice de figuras',
+        'figura ', 'tabla ', 'jurado dictaminador', 'jurado:',
+        'nombre de la institucion', 'organizacion sincronica', 'organizacion diacronica',
+    ]
+    if any(k in norm for k in skip_keys):
+        return ''
+
+    # ── Portada / elementos de carátura → ya se generan aparte ───────────────
+    cover_keys = ['universidad', 'facultad', 'escuela profesional', 'carrera profesional',
+                  'autor(es)', 'linea de investigacion', 'ciudad', '— peru']
+    if any(k in norm for k in cover_keys):
+        return ''
+
+    # ── Secciones iniciales ───────────────────────────────────────────────────
+    if any(k in norm for k in ['presentacion', 'presentación']):
+        return (
+            f"Señores miembros del jurado:\n\n"
+            f"En cumplimiento de los lineamientos establecidos por el Reglamento de Grados "
+            f"y Títulos de la institución, presento ante ustedes el proyecto de tesis titulado "
+            f"«{title}», elaborado con la finalidad de obtener el grado académico correspondiente. "
+            f"El presente documento representa el resultado de una investigación sistemática "
+            f"orientada a contribuir al conocimiento en el campo de {rl or 'la ingeniería de sistemas'}, "
+            f"respondiendo a una problemática identificada en el contexto institucional y social. "
+            f"Someto el presente trabajo a su consideración y espero que cumpla con los requisitos "
+            f"de aprobación establecidos."
+        )
+    if any(k in norm for k in ['dedicatoria']):
+        return (
+            f"A mis padres y familia, quienes con su apoyo incondicional hicieron posible "
+            f"el logro de mis metas académicas y profesionales."
+        )
+    if any(k in norm for k in ['agradecimiento']) and 'conflicto' not in norm:
+        return (
+            f"Expreso mi profundo agradecimiento a mi asesor, a los docentes de la "
+            f"institución, y a todas las personas e instituciones que colaboraron en el "
+            f"desarrollo de esta investigación. Su orientación y apoyo fueron fundamentales "
+            f"para alcanzar los objetivos planteados."
+        )
+
+    # ── Resumen / Abstract ────────────────────────────────────────────────────
+    if any(k in norm for k in ['resumen']):
+        return all_sec.get('resumen', _resumen(title, rl))
+    if any(k in norm for k in ['abstract']):
+        return all_sec.get('abstract', _abstract(title, rl))
+    if any(k in norm for k in ['palabras clave', 'keywords']):
+        return ''  # siempre inline con el resumen
+
+    # ── Capítulo I / Introducción / Problema ─────────────────────────────────
+    if any(k in norm for k in ['realidad problem', 'situacion problem', 'contexto problem']):
         return _rp(title, rl)
-    if any(k in norm for k in ['antecedente', 'estado del arte', 'trabajos previos']):
+    if any(k in norm for k in ['antecedente', 'estado del arte', 'trabajos previos',
+                                'investigaciones previas']):
         return _ant(title)
-    if any(k in norm for k in ['marco teorico', 'bases teoricas', 'fundamentacion']):
+    if any(k in norm for k in ['marco teorico', 'bases teoricas', 'fundamentacion',
+                                'marco conceptual', 'marco referencial', 'marco cientifico']):
         return _mt(title, rl)
-    if any(k in norm for k in ['justificacion', 'importancia', 'relevancia']):
+    if any(k in norm for k in ['justificacion', 'importancia', 'relevancia', 'pertinencia']):
         return _just(title)
-    if any(k in norm for k in ['planteamiento', 'problema de investigacion', 'formulacion']):
-        return all_sec.get('prob', f"¿De qué manera {title.split()[0] if title else 'la propuesta'} influye en los resultados organizacionales?")
-    if any(k in norm for k in ['hipotesis', 'suposicion']):
-        return all_sec.get('hip', f"La implementación de {' '.join(title.split()[:4])} mejora significativamente los indicadores de desempeño (p < 0.05).")
-    if any(k in norm for k in ['objetivo general']):
-        return all_sec.get('obj_gen', f"Determinar el efecto de {' '.join(title.split()[:4])} sobre los indicadores de desempeño organizacional.")
-    if any(k in norm for k in ['objetivo especific', 'objetivos especificos']):
+    if any(k in norm for k in ['planteamiento del problem', 'problema de investigacion',
+                                'formulacion del problem']):
+        return all_sec.get('prob', f"¿De qué manera {kw4} incide en los indicadores de desempeño organizacional?")
+    if any(k in norm for k in ['hipotesis']):
+        return all_sec.get('hip', f"La implementación de {kw4} mejora significativamente los indicadores de desempeño (p < 0.05).")
+    if 'objetivo general' in norm:
+        return all_sec.get('obj_gen', f"Determinar el efecto de {kw4} sobre los indicadores de desempeño organizacional.")
+    if any(k in norm for k in ['objetivo especific', 'objetivos especific']):
         obj = all_sec.get('obj_esp', [])
         return '\n'.join(f"OE{i+1}: {o}" for i, o in enumerate(obj[:3])) if obj else ''
-    if any(k in norm for k in ['limitacion', 'delimitacion', 'alcance']):
-        return all_sec.get('lim', f"El estudio se delimita geográficamente al ámbito de {rl or 'la institución evaluada'}, con una temporalidad de 12 meses.")
-    if any(k in norm for k in ['metodolog', 'capitulo ii', 'tipo de investigacion',
-                                'diseno', 'poblacion', 'muestra']):
-        return all_sec.get('cap2', _cap2(title, rl)).get('tipo', _cap2(title, rl)) if isinstance(all_sec.get('cap2'), dict) else all_sec.get('cap2', _cap2(title, rl))
-    if any(k in norm for k in ['resultado', 'capitulo iii', 'hallazgos']):
-        return all_sec.get('cap3', _cap3(title))
-    if any(k in norm for k in ['discusion', 'capitulo iv', 'interpretacion']):
-        return all_sec.get('cap4', _cap4(title))
-    if any(k in norm for k in ['conclusion', 'recomendacion', 'capitulo v']):
-        return all_sec.get('cap5', _cap5(title))
-    if any(k in norm for k in ['resumen', 'abstract']):
-        return all_sec.get('resumen', _resumen(title, rl))
+    if 'objetivo' in norm and 'general' not in norm and 'especif' not in norm:
+        return (
+            all_sec.get('obj_gen', f"Determinar el efecto de {kw4} sobre los indicadores de desempeño.") +
+            '\n' + '\n'.join(f"OE{i+1}: {o}" for i, o in enumerate(all_sec.get('obj_esp', [])[:3]))
+        )
+    if any(k in norm for k in ['limitacion', 'delimitacion', 'alcance del estudio']):
+        return all_sec.get('lim', f"El estudio se delimita al ámbito de {rl or 'la institución evaluada'}, con una temporalidad de doce meses.")
+
+    # ── Introducción (artículos) ──────────────────────────────────────────────
     if any(k in norm for k in ['introducc', 'capitulo i']):
-        return _rp(title, rl)
-    # Contenido genérico para secciones no reconocidas
-    kw = ' '.join(title.split()[:4])
+        # Distinguir si es tesis (Realidad Problemática) o artículo (Introducción directa)
+        intro = all_sec.get('introduction', '')
+        return intro if intro else _rp(title, rl)
+
+    # ── Capítulo II / Metodología ─────────────────────────────────────────────
+    if any(k in norm for k in ['metodolog', 'metodo', 'capitulo ii', 'marco metodologico',
+                                'tipo de investigacion', 'diseno de investigacion',
+                                'poblacion', 'muestra', 'variables']):
+        cap2 = all_sec.get('cap2', None) or all_sec.get('cap2_proyecto', None) or all_sec.get('methodology', None)
+        if cap2:
+            return cap2.get('tipo', cap2) if isinstance(cap2, dict) else cap2
+        return _cap2(title, rl)
+    if any(k in norm for k in ['operacionalizacion', 'operacionali']):
+        return ''  # la tabla se inserta aparte por el builder
+
+    # ── Capítulo III / Aspectos administrativos / Resultados ─────────────────
+    if any(k in norm for k in ['aspectos administrativos', 'administrat']):
+        return ''  # contiene sub-secciones (cronograma, presupuesto)
+    if any(k in norm for k in ['cronograma']):
+        return ''  # la tabla se inserta aparte
+    if any(k in norm for k in ['presupuesto', 'financiamiento', 'recursos economic']):
+        return ''  # la tabla se inserta aparte
+    if any(k in norm for k in ['resultado y discusion', 'resultados y discusion',
+                                'resultados de la revision']):
+        return all_sec.get('resultados_discusion', all_sec.get('results', _cap3(title)))
+    if any(k in norm for k in ['resultado', 'capitulo iii', 'hallazgo']):
+        return all_sec.get('cap3', all_sec.get('results', _cap3(title)))
+    if any(k in norm for k in ['discusion', 'capitulo iv', 'interpretacion', 'analisis']):
+        return all_sec.get('cap4', all_sec.get('discussion', _cap4(title)))
+
+    # ── Conclusiones / Cap V ──────────────────────────────────────────────────
+    if any(k in norm for k in ['conclusion', 'recomendacion', 'capitulo v']):
+        return all_sec.get('cap5', all_sec.get('conclusions', _cap5(title)))
+
+    # ── Secciones finales de artículos RCSI ──────────────────────────────────
+    if any(k in norm for k in ['conflicto de interes']):
+        return all_sec.get('conflicto_intereses', 'No existe ningún tipo de conflicto de interés relacionado con la materia del trabajo.')
+    if any(k in norm for k in ['fuente de financiamiento', 'patrocinio', 'financiado por']):
+        return all_sec.get('fuente_financiamiento', 'Los autores no recibieron ningún patrocinio para llevar a cabo este estudio.')
+    if any(k in norm for k in ['contribucion de autoria', 'credit', 'taxonomia credit']):
+        return all_sec.get('contribucion_autoria', '')
+    if any(k in norm for k in ['disponibilidad de dato', 'datos depositados']):
+        return all_sec.get('disponibilidad_datos', 'No aplica.')
+
+    # ── Declaración Jurada / Constancia ──────────────────────────────────────
+    if any(k in norm for k in ['declaracion jurada', 'declaracion de autoria']):
+        return (
+            f"Yo/Nosotros, declaramos bajo juramento que el presente trabajo titulado "
+            f"«{title}» es de nuestra autoría, no ha sido plagiado ni publicado anteriormente, "
+            f"y cumple con los principios éticos y normas académicas vigentes."
+        )
+    if any(k in norm for k in ['constancia', 'instrumento de recoleccion', 'instrumento']):
+        return (
+            f"Se adjuntan los instrumentos de recolección de datos utilizados en la "
+            f"presente investigación sobre {kw4}, debidamente validados por juicio de expertos "
+            f"(CVC = 0.87) y con alta confiabilidad interna (α de Cronbach = 0.912)."
+        )
+
+    # ── Referencias (skip — el builder las agrega siempre al final) ──────────
+    if any(k in norm for k in ['referencia', 'fuentes']):
+        return ''
+
+    # ── Anexos (skip — el builder detecta cada anexo individualmente) ────────
+    if norm.strip() in ('anexos', 'anexo', 'anexos:'):
+        return ''
+
+    # ── Contenido genérico para cualquier otra sección ────────────────────────
     return (
-        f"En el marco de la investigación sobre {kw}, esta sección desarrolla los aspectos "
-        f"correspondientes a {section_title}, tomando como referencia los lineamientos "
-        f"establecidos por las normas académicas vigentes y los estándares internacionales "
-        f"de investigación científica. El análisis se sustenta en la revisión sistemática de "
-        f"la literatura especializada y en los datos primarios recolectados durante el trabajo de campo."
+        f"En el marco de la investigación sobre {kw4}, esta sección desarrolla "
+        f"los aspectos correspondientes a «{section_title}», tomando como referencia "
+        f"los lineamientos establecidos por las normas académicas vigentes y los "
+        f"estándares internacionales de investigación científica. El análisis se sustenta "
+        f"en la revisión sistemática de la literatura especializada y en los datos "
+        f"primarios recolectados durante el trabajo de campo."
     )
 
 
@@ -3308,46 +3428,63 @@ def _build_pdf_from_template(data: dict, template_structure: dict, all_sec: dict
     title = data['title']
     table_idx = 0
     tables_in_template = template_structure.get('tables', [])
+    doc_hint = template_structure.get('doc_type_hint', 'tesis')
+    has_cover = template_structure.get('has_cover', True)
 
-    # Carátula siempre
-    sp(30)
-    if logo_path and os.path.exists(logo_path):
-        try:
-            from reportlab.platypus import Image as _RLImg
-            lg = _RLImg(logo_path, width=4*cm, height=4*cm)
-            lg.hAlign = 'CENTER'
-            story.append(lg)
-            sp(14)
-        except Exception:
-            sp(26)
-    else:
-        sp(30)
-    p("UNIVERSIDAD NACIONAL DE TRUJILLO", 'h1')
-    p("FACULTAD DE INGENIERÍA", 'c')
-    p("ESCUELA PROFESIONAL DE INGENIERÍA DE SISTEMAS", 'c')
-    sp(30)
-    story.append(HRFlowable(width='100%', thickness=2, color=colors.HexColor('#1e3a5f')))
-    sp(16)
-    p(title.upper(), 'h1')
-    sp(16)
-    story.append(HRFlowable(width='100%', thickness=2, color=colors.HexColor('#1e3a5f')))
-    sp(30)
     authors = data.get('authors', 'Autor')
     if isinstance(authors, str):
         authors = [a.strip() for a in authors.split(',')]
-    for a in authors:
-        p(a.upper(), 'c')
-    p(f"Asesor: {data.get('advisor','')}", 'c')
-    p(f"{data.get('city','Trujillo').upper()} — PERÚ   {data.get('year', datetime.now().year)}", 'c')
-    br()
+
+    # ── Portada adaptativa ────────────────────────────────────────────────────
+    # Para artículos: no hay portada, solo encabezado.
+    # Para tesis/proyecto: portada con datos del usuario (sin institución fija).
+    if doc_hint == 'articulo':
+        sp(10)
+        p(title, 'h1')
+        sp(6)
+        for i, a in enumerate(authors, 1):
+            p(f"{a} {i}  — {data.get('city','Trujillo')}, Perú  {data.get('year', datetime.now().year)}", 'c')
+        story.append(HRFlowable(width='100%', thickness=1, color=colors.HexColor('#1e3a5f')))
+        sp(10)
+    else:
+        sp(30)
+        if logo_path and os.path.exists(logo_path):
+            try:
+                from reportlab.platypus import Image as _RLImg
+                lg = _RLImg(logo_path, width=4*cm, height=4*cm)
+                lg.hAlign = 'CENTER'
+                story.append(lg)
+                sp(14)
+            except Exception:
+                sp(26)
+        else:
+            sp(30)
+        story.append(HRFlowable(width='100%', thickness=2, color=colors.HexColor('#1e3a5f')))
+        sp(16)
+        p(title.upper(), 'h1')
+        sp(16)
+        story.append(HRFlowable(width='100%', thickness=2, color=colors.HexColor('#1e3a5f')))
+        sp(30)
+        for a in authors:
+            p(a.upper(), 'c')
+        p(f"Asesor: {data.get('advisor','')}", 'c')
+        if data.get('research_line'):
+            p(f"Línea de investigación: {data.get('research_line','')}", 'c')
+        p(f"{data.get('city','Trujillo').upper()} — PERÚ   {data.get('year', datetime.now().year)}", 'c')
+        br()
 
     # Recorrer secciones de la plantilla
     sections = template_structure.get('sections', [])
     if not sections:
-        # Sin secciones detectadas: generar contenido estándar según tipo
-        p("CONTENIDO PRINCIPAL", 'h1')
-        p(_rp(title, rl), 'n')
-        p(_ant(title), 'n')
+        # Sin secciones detectadas: usar estructura base según tipo
+        if doc_hint == 'articulo':
+            p("1    Introducción", 'h1'); p(_rp(title, rl), 'n'); sp(8)
+            p("2    Materiales y métodos", 'h1'); p(_cap2(title, rl), 'n'); sp(8)
+            p("3    Resultados y discusión", 'h1'); p(_cap3(title), 'n'); sp(8)
+            p("Conclusiones", 'h2'); p(_cap5(title), 'n')
+        else:
+            p("CAPÍTULO I: EL PROBLEMA DE INVESTIGACIÓN", 'h1')
+            p(_rp(title, rl), 'n'); p(_ant(title), 'n')
     else:
         prev_level = 0
         for sec_item in sections:
@@ -3471,18 +3608,34 @@ def _build_docx_from_template(data: dict, template_structure: dict, all_sec: dic
             for c_idx, val in enumerate(row[:len(headers)]):
                 t.rows[r_idx + 1].cells[c_idx].text = str(val)
 
-    # Carátula
-    add_para(title.upper(), bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_para(' · '.join(authors), align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_para(f"Asesor: {data.get('advisor','')}", align=WD_ALIGN_PARAGRAPH.CENTER)
-    add_para(f"{data.get('city','Trujillo').upper()} — {data.get('year', datetime.now().year)}", align=WD_ALIGN_PARAGRAPH.CENTER)
-    doc.add_page_break()
+    doc_hint = template_structure.get('doc_type_hint', 'tesis')
+
+    # ── Portada adaptativa ────────────────────────────────────────────────────
+    if doc_hint == 'articulo':
+        add_h(title, 1)
+        for i, a in enumerate(authors, 1):
+            add_para(f"{a} {i}  —  {data.get('city','Trujillo')}, Perú  {data.get('year', datetime.now().year)}",
+                     align=WD_ALIGN_PARAGRAPH.CENTER)
+    else:
+        add_para(title.upper(), bold=True, align=WD_ALIGN_PARAGRAPH.CENTER)
+        add_para(' · '.join(authors), align=WD_ALIGN_PARAGRAPH.CENTER)
+        add_para(f"Asesor: {data.get('advisor','')}", align=WD_ALIGN_PARAGRAPH.CENTER)
+        if data.get('research_line'):
+            add_para(f"Línea de investigación: {data.get('research_line','')}", align=WD_ALIGN_PARAGRAPH.CENTER)
+        add_para(f"{data.get('city','Trujillo').upper()} — {data.get('year', datetime.now().year)}",
+                 align=WD_ALIGN_PARAGRAPH.CENTER)
+        doc.add_page_break()
 
     sections = template_structure.get('sections', [])
     if not sections:
-        add_h("CONTENIDO", 1)
-        add_para(_rp(title, rl))
-        add_para(_ant(title))
+        if doc_hint == 'articulo':
+            add_h("1    Introducción", 1); add_para(_rp(title, rl))
+            add_h("2    Materiales y métodos", 1); add_para(_cap2(title, rl))
+            add_h("3    Resultados y discusión", 1); add_para(_cap3(title))
+            add_h("Conclusiones", 2); add_para(_cap5(title))
+        else:
+            add_h("CAPÍTULO I: EL PROBLEMA DE INVESTIGACIÓN", 1)
+            add_para(_rp(title, rl)); add_para(_ant(title))
     else:
         for sec_item in sections:
             level = sec_item.get('level', 2)
@@ -3617,8 +3770,8 @@ def generate_document(data: dict) -> dict:
         sec['cap5']     = _cap5(title)
 
     # Construir PDF y DOCX
-    if template_structure and template_structure.get('sections'):
-        # Con plantilla: respetar su estructura
+    if template_structure is not None:
+        # Con plantilla: el builder respeta íntegramente la estructura de la plantilla
         pdf_path  = _build_pdf_from_template(data, template_structure, sec, refs, uid, logo_path)
         docx_path = _build_docx_from_template(data, template_structure, sec, refs, uid, logo_path)
     elif doc_type == 'proyecto_tesis':
