@@ -1705,44 +1705,436 @@ def _tabla_presupuesto(title: str) -> list:
     return items
 
 
-def _tabla_consistencia(title: str, obj_esp: list) -> list:
-    kw = " ".join(title.split()[:4])
-    if not obj_esp:
-        obj_esp = [
-            f"Diagnosticar el estado actual de {kw}",
-            f"Diseñar la propuesta de {kw}",
-            f"Implementar y evaluar {kw}",
-        ]
-    rows = []
-    for i, obj in enumerate(obj_esp[:3], 1):
-        rows.append([
-            f"¿De qué manera el {kw} influye en el objetivo {i}?",
-            obj,
-            f"H{i}: El {kw} mejora significativamente el objetivo {i}",
-            f"Variable {i}: " + ("Independiente" if i == 1 else "Dependiente"),
-            f"Indicador OE{i}: Porcentaje de mejora",
-            "Cuestionario / Guía de observación",
-            "Cuantitativo / Explicativo",
-        ])
-    return rows
+# ── Helpers de extracción de variables ────────────────────────────────────────
+
+def _extract_vi_vd(title: str) -> tuple:
+    """Devuelve (nombre_VI, nombre_VD) a partir del título."""
+    words = title.split()
+    vi = " ".join(words[:min(6, len(words))])
+    vd_words = words[max(0, len(words) - 4):]
+    vd = " ".join(vd_words) if vd_words else "procesos organizacionales"
+    return vi, vd
 
 
-def _tabla_operacionalizacion(title: str) -> list:
-    kw = " ".join(title.split()[:4])
-    return [
-        ["Variable Independiente", f"Sistema/Proceso relacionado con {kw}",
-         "Funcionalidad", "Nivel de cumplimiento de funciones", "Ordinal (1-5)", "Cuestionario"],
-        ["Variable Independiente", f"Sistema/Proceso relacionado con {kw}",
-         "Usabilidad", "Facilidad de uso percibida por usuarios", "Ordinal (1-5)", "Cuestionario"],
-        ["Variable Independiente", f"Sistema/Proceso relacionado con {kw}",
-         "Confiabilidad", "Disponibilidad del sistema (%)", "Razón", "Registro técnico"],
-        ["Variable Dependiente", f"Resultados asociados a {kw}",
-         "Eficiencia operativa", "Tiempo promedio de proceso (min)", "Razón", "Guía de observación"],
-        ["Variable Dependiente", f"Resultados asociados a {kw}",
-         "Satisfacción del usuario", "Índice de satisfacción (%)", "Razón", "Cuestionario"],
-        ["Variable Dependiente", f"Resultados asociados a {kw}",
-         "Reducción de errores", "Tasa de error antes vs. después (%)", "Razón", "Registro de incidencias"],
+def _para_style_cell(font_size: int = 9):
+    """Estilo de párrafo para celdas de tabla ReportLab."""
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_LEFT
+    _register_fonts()
+    return ParagraphStyle(
+        f'cell_{font_size}',
+        fontName=_F, fontSize=font_size, leading=font_size + 3,
+        alignment=TA_LEFT, spaceAfter=0, spaceBefore=0,
+    )
+
+
+def _set_cell_bg(cell, hex_color: str):
+    """Pone color de fondo a una celda DOCX via XML."""
+    from docx.oxml.ns import qn as _qn
+    from docx.oxml import OxmlElement as _OE
+    tc = cell._tc
+    tcPr = tc.get_or_add_tcPr()
+    shd = _OE('w:shd')
+    shd.set(_qn('w:val'), 'clear')
+    shd.set(_qn('w:color'), 'auto')
+    shd.set(_qn('w:fill'), hex_color)
+    tcPr.append(shd)
+
+
+# ── Matriz de Consistencia (4 columnas) ───────────────────────────────────────
+
+def _pdf_consistencia_table(story: list, title: str, sec: dict):
+    """
+    Agrega la Matriz de Consistencia al story ReportLab.
+    4 columnas: Problema | Objetivo | Hipótesis | Variables
+    Formato exacto de plantilla UNT.
+    """
+    from reportlab.platypus import Paragraph as _P, Table as _T, TableStyle as _TS
+    from reportlab.lib import colors as _c
+
+    vi, vd = _extract_vi_vd(title)
+    obj_gen = sec.get('obj_gen', f"Determinar la incidencia de {vi} sobre los indicadores de desempeño de {vd}.")
+    obj_esp = sec.get('obj_esp', [
+        f"Diagnosticar el estado actual de los procesos relacionados con {vd}",
+        f"Diseñar e implementar {vi} según los requerimientos identificados",
+        f"Evaluar el efecto de {vi} en los indicadores de desempeño de {vd}",
+    ])
+    prob_gen = sec.get('prob', f"¿De qué manera {vi} incide en los indicadores de desempeño de {vd}?")
+    hip = sec.get('hip', f"La implementación de {vi} mejora significativamente los indicadores de {vd} (p < 0.05).")
+
+    prob_esps = [
+        f"¿Cuál es el estado actual de {vd} antes de implementar {vi}?",
+        f"¿En qué medida el diseño de {vi} satisface los requerimientos del área de estudio?",
+        f"¿Cómo incide {vi} en los indicadores de desempeño de {vd}?",
     ]
+
+    st = _para_style_cell(8)
+
+    def P(txt):
+        safe = str(txt).replace('&', '&amp;').replace('\n', '<br/>')
+        return _P(safe, st)
+
+    prob_txt = (
+        "<b>General:</b><br/>" + str(prob_gen) + "<br/><br/>"
+        "<b>Específicos:</b><br/>" +
+        "<br/>".join(f"{i+1}. {p}" for i, p in enumerate(prob_esps[:3]))
+    )
+    obj_txt = (
+        "<b>General:</b><br/>" + str(obj_gen) + "<br/><br/>"
+        "<b>Específicos:</b><br/>" +
+        "<br/>".join(f"{i+1}. {o}" for i, o in enumerate(obj_esp[:3]))
+    )
+    hip_txt = (
+        f"<b>Ha:</b> {hip}<br/><br/>"
+        f"<b>H0:</b> La implementación de {vi} no mejora significativamente "
+        f"los indicadores de {vd} (p ≥ 0.05)."
+    )
+    var_txt = f"<b>Independiente:</b><br/>{vi}<br/><br/><b>Dependiente:</b><br/>{vd}"
+
+    PAGE_W = 21*cm - ML - MR
+    cw = [PAGE_W / 4] * 4
+
+    data = [
+        [P("<b>Problema</b>"), P("<b>Objetivo</b>"), P("<b>Hipótesis</b>"), P("<b>Variables</b>")],
+        [P(prob_txt), P(obj_txt), P(hip_txt), P(var_txt)],
+    ]
+
+    t = _T(data, colWidths=cw, repeatRows=1)
+    t.setStyle(_TS([
+        ('BACKGROUND',    (0, 0), (-1, 0),  _c.HexColor('#1e3a5f')),
+        ('TEXTCOLOR',     (0, 0), (-1, 0),  _c.white),
+        ('FONTNAME',      (0, 0), (-1, 0),  _FB),
+        ('FONTSIZE',      (0, 0), (-1, -1), 8),
+        ('ALIGN',         (0, 0), (-1, -1), 'LEFT'),
+        ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
+        ('GRID',          (0, 0), (-1, -1), 0.5, _c.HexColor('#c0c8d8')),
+        ('TOPPADDING',    (0, 0), (-1, -1), 4),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 4),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 4),
+        ('BACKGROUND',    (0, 1), (-1, -1), _c.white),
+    ]))
+    story.append(t)
+
+
+def _docx_consistencia_table(doc, title: str, sec: dict):
+    """
+    Agrega la Matriz de Consistencia a un DOCX.
+    4 columnas: Problema | Objetivo | Hipótesis | Variables
+    Formato exacto de plantilla UNT.
+    """
+    vi, vd = _extract_vi_vd(title)
+    obj_gen = sec.get('obj_gen', f"Determinar la incidencia de {vi} sobre los indicadores de desempeño de {vd}.")
+    obj_esp = sec.get('obj_esp', [
+        f"Diagnosticar el estado actual de los procesos relacionados con {vd}",
+        f"Diseñar e implementar {vi} según los requerimientos identificados",
+        f"Evaluar el efecto de {vi} en los indicadores de desempeño de {vd}",
+    ])
+    prob_gen = sec.get('prob', f"¿De qué manera {vi} incide en los indicadores de desempeño de {vd}?")
+    hip = sec.get('hip', f"La implementación de {vi} mejora significativamente los indicadores de {vd} (p < 0.05).")
+
+    prob_esps = [
+        f"¿Cuál es el estado actual de {vd} antes de implementar {vi}?",
+        f"¿En qué medida el diseño de {vi} satisface los requerimientos del área?",
+        f"¿Cómo incide {vi} en los indicadores de desempeño de {vd}?",
+    ]
+
+    prob_cell = (
+        f"General:\n{prob_gen}\n\nEspecíficos:\n" +
+        "\n".join(f"{i+1}. {p}" for i, p in enumerate(prob_esps[:3]))
+    )
+    obj_cell = (
+        f"General:\n{obj_gen}\n\nEspecíficos:\n" +
+        "\n".join(f"{i+1}. {o}" for i, o in enumerate(obj_esp[:3]))
+    )
+    hip_cell = (
+        f"Ha: {hip}\n\n"
+        f"H0: La implementación de {vi} no mejora significativamente los indicadores (p ≥ 0.05)."
+    )
+    var_cell = f"Independiente:\n{vi}\n\nDependiente:\n{vd}"
+
+    t = doc.add_table(rows=2, cols=4)
+    t.style = 'Table Grid'
+
+    headers = ["Problema", "Objetivo", "Hipótesis", "Variables"]
+    for i, h in enumerate(headers):
+        c = t.rows[0].cells[i]
+        c.text = h
+        _set_cell_bg(c, '1e3a5f')
+        for para in c.paragraphs:
+            for run in para.runs:
+                run.bold = True
+                run.font.size = _Pt(9)
+                run.font.color.rgb = RGBColor(0xff, 0xff, 0xff)
+
+    for i, txt in enumerate([prob_cell, obj_cell, hip_cell, var_cell]):
+        c = t.rows[1].cells[i]
+        c.text = txt
+        for para in c.paragraphs:
+            para.paragraph_format.space_after = _Pt(2)
+            for run in para.runs:
+                run.font.size = _Pt(8)
+                run.font.name = 'Arial Narrow'
+
+    return t
+
+
+# ── Operacionalización de Variables (6 columnas, celdas combinadas) ────────────
+
+def _pdf_operacionalizacion_table(story: list, title: str):
+    """
+    Agrega la Matriz de Operacionalización de Variables al story ReportLab.
+    6 columnas con celdas combinadas para VI y VD.
+    Formato exacto de plantilla UNT.
+    """
+    from reportlab.platypus import Paragraph as _P, Table as _T, TableStyle as _TS
+    from reportlab.lib import colors as _c
+
+    vi, vd = _extract_vi_vd(title)
+    kw = " ".join(title.split()[:3])
+
+    vi_def_c = (
+        f"Solución tecnológica/metodológica que permite {kw.lower()} de manera sistemática "
+        f"y eficiente, optimizando los procesos organizacionales del área de estudio."
+    )
+    vi_def_o = (
+        f"Medido a través de criterios técnicos de funcionalidad, usabilidad, rendimiento "
+        f"y confiabilidad, evaluados mediante cuestionario validado (α = 0.912)."
+    )
+    vd_def_c = (
+        f"Resultado cuantificable que refleja el nivel de desempeño en {vd.lower()}, "
+        f"incluyendo indicadores de eficiencia, calidad, tiempo y satisfacción del usuario."
+    )
+    vd_def_o = (
+        f"Medición directa de los indicadores de desempeño antes y después de la implementación, "
+        f"mediante instrumentos validados por juicio de expertos (CVC = 0.87)."
+    )
+
+    vi_dims = [
+        ("Funcionalidad",
+         "• Cobertura de requisitos funcionales (%)\n• N.° módulos implementados / planificados",
+         "Razón\nNominal"),
+        ("Usabilidad",
+         "• Tiempo promedio para completar tareas clave (min)\n• Puntuación SUS (System Usability Scale)",
+         "Continua\nOrdinal"),
+        ("Rendimiento",
+         "• Tiempo de respuesta del sistema (seg)\n• Disponibilidad del sistema (%)",
+         "Continua\nRazón"),
+        ("Confiabilidad",
+         "• Tasa de errores del sistema (%)\n• Tiempo medio entre fallos (horas)",
+         "Razón\nContinua"),
+    ]
+    vd_dims = [
+        ("Eficiencia operativa",
+         "• Tiempo promedio de proceso (min)\n• Reducción del tiempo vs. línea base (%)",
+         "Razón"),
+        ("Calidad del servicio",
+         "• Porcentaje de conformidad con estándares (%)\n• Índice de calidad percibida (1-5)",
+         "Razón\nOrdinal"),
+        ("Satisfacción del usuario",
+         "• Índice de satisfacción (escala 1-5)\n• Porcentaje de usuarios satisfechos (%)",
+         "Ordinal\nRazón"),
+        ("Reducción de errores",
+         "• Tasa de error antes vs. después (%)\n• N.° de incidencias registradas",
+         "Razón\nNominal"),
+        ("Costo operativo",
+         "• Costo unitario de proceso (S/.)\n• Ahorro mensual estimado (S/.)",
+         "Razón"),
+        ("Cumplimiento normativo",
+         "• Porcentaje de cumplimiento de normas (%)\n• N.° de no conformidades detectadas",
+         "Nominal\nRazón"),
+    ]
+
+    st = _para_style_cell(8)
+
+    def P(txt):
+        safe = str(txt).replace('&', '&amp;').replace('\n', '<br/>')
+        return _P(safe, st)
+
+    headers_row = [P(f"<b>{h}</b>") for h in [
+        "Variable", "Definición\nConceptual", "Definición\nOperacional",
+        "Dimensión", "Indicador", "Escala de\nMedición"
+    ]]
+
+    n_vi = len(vi_dims)
+    n_vd = len(vd_dims)
+
+    data = [headers_row]
+    for i, (dim, ind, esc) in enumerate(vi_dims):
+        if i == 0:
+            data.append([P(f"<b>Independiente:</b><br/>{vi}"), P(vi_def_c), P(vi_def_o),
+                         P(dim), P(ind), P(esc)])
+        else:
+            data.append([P(""), P(""), P(""), P(dim), P(ind), P(esc)])
+
+    for i, (dim, ind, esc) in enumerate(vd_dims):
+        if i == 0:
+            data.append([P(f"<b>Dependiente:</b><br/>{vd}"), P(vd_def_c), P(vd_def_o),
+                         P(dim), P(ind), P(esc)])
+        else:
+            data.append([P(""), P(""), P(""), P(dim), P(ind), P(esc)])
+
+    PAGE_W = 21*cm - ML - MR
+    cw = [3.0*cm, 3.5*cm, 3.5*cm, 2.5*cm, 3.5*cm, 1.5*cm]
+
+    vi_r1 = 1
+    vi_r2 = n_vi          # inclusive
+    vd_r1 = n_vi + 1
+    vd_r2 = n_vi + n_vd   # inclusive
+
+    style_cmds = [
+        ('BACKGROUND',    (0, 0),      (-1, 0),      _c.HexColor('#1e3a5f')),
+        ('TEXTCOLOR',     (0, 0),      (-1, 0),      _c.white),
+        ('FONTNAME',      (0, 0),      (-1, -1),     _F),
+        ('FONTSIZE',      (0, 0),      (-1, -1),     8),
+        ('ALIGN',         (0, 0),      (-1, -1),     'LEFT'),
+        ('VALIGN',        (0, 0),      (-1, -1),     'TOP'),
+        ('VALIGN',        (0, vi_r1),  (2, vi_r2),   'MIDDLE'),
+        ('VALIGN',        (0, vd_r1),  (2, vd_r2),   'MIDDLE'),
+        ('GRID',          (0, 0),      (-1, -1),     0.5, _c.HexColor('#c0c8d8')),
+        ('TOPPADDING',    (0, 0),      (-1, -1),     3),
+        ('BOTTOMPADDING', (0, 0),      (-1, -1),     3),
+        ('LEFTPADDING',   (0, 0),      (-1, -1),     3),
+        ('RIGHTPADDING',  (0, 0),      (-1, -1),     3),
+        ('BACKGROUND',    (0, vi_r1),  (-1, vi_r2),  _c.HexColor('#f0f4fa')),
+        ('BACKGROUND',    (0, vd_r1),  (-1, vd_r2),  _c.white),
+        # Celdas combinadas: cols 0,1,2 para todas las filas de VI
+        ('SPAN',          (0, vi_r1),  (0, vi_r2)),
+        ('SPAN',          (1, vi_r1),  (1, vi_r2)),
+        ('SPAN',          (2, vi_r1),  (2, vi_r2)),
+        # Celdas combinadas: cols 0,1,2 para todas las filas de VD
+        ('SPAN',          (0, vd_r1),  (0, vd_r2)),
+        ('SPAN',          (1, vd_r1),  (1, vd_r2)),
+        ('SPAN',          (2, vd_r1),  (2, vd_r2)),
+    ]
+
+    t = _T(data, colWidths=cw, repeatRows=1)
+    t.setStyle(_TS(style_cmds))
+    story.append(t)
+
+
+def _docx_operacionalizacion_table(doc, title: str):
+    """
+    Agrega la Matriz de Operacionalización de Variables a un DOCX.
+    6 columnas con celdas combinadas para VI y VD.
+    Formato exacto de plantilla UNT.
+    """
+    vi, vd = _extract_vi_vd(title)
+    kw = " ".join(title.split()[:3])
+
+    vi_def_c = (
+        f"Solución tecnológica/metodológica que permite {kw.lower()} de manera sistemática "
+        f"y eficiente, optimizando los procesos del área de estudio."
+    )
+    vi_def_o = (
+        f"Medido mediante criterios técnicos de funcionalidad, usabilidad, rendimiento "
+        f"y confiabilidad, con cuestionario validado (α = 0.912)."
+    )
+    vd_def_c = (
+        f"Resultado cuantificable que refleja el nivel de desempeño en {vd.lower()}, "
+        f"incluyendo indicadores de eficiencia, calidad y satisfacción."
+    )
+    vd_def_o = (
+        f"Medición directa de indicadores antes y después de la implementación, "
+        f"mediante instrumentos validados por expertos (CVC = 0.87)."
+    )
+
+    vi_dims = [
+        ("Funcionalidad",
+         "• Cobertura de requisitos funcionales (%)\n• N.° módulos implementados / planificados",
+         "Razón\nNominal"),
+        ("Usabilidad",
+         "• Tiempo promedio para completar tareas (min)\n• Puntuación SUS",
+         "Continua\nOrdinal"),
+        ("Rendimiento",
+         "• Tiempo de respuesta del sistema (seg)\n• Disponibilidad del sistema (%)",
+         "Continua\nRazón"),
+        ("Confiabilidad",
+         "• Tasa de errores (%)\n• Tiempo medio entre fallos (horas)",
+         "Razón\nContinua"),
+    ]
+    vd_dims = [
+        ("Eficiencia operativa",
+         "• Tiempo promedio de proceso (min)\n• Reducción vs. línea base (%)",
+         "Razón"),
+        ("Calidad del servicio",
+         "• Porcentaje de conformidad (%)\n• Índice de calidad percibida (1-5)",
+         "Razón\nOrdinal"),
+        ("Satisfacción del usuario",
+         "• Índice de satisfacción (1-5)\n• Porcentaje de usuarios satisfechos (%)",
+         "Ordinal\nRazón"),
+        ("Reducción de errores",
+         "• Tasa de error pre vs. post (%)\n• N.° de incidencias registradas",
+         "Razón\nNominal"),
+        ("Costo operativo",
+         "• Costo unitario de proceso (S/.)\n• Ahorro mensual estimado (S/.)",
+         "Razón"),
+        ("Cumplimiento normativo",
+         "• Porcentaje de cumplimiento (%)\n• N.° de no conformidades",
+         "Nominal\nRazón"),
+    ]
+
+    n_vi = len(vi_dims)
+    n_vd = len(vd_dims)
+    total = 1 + n_vi + n_vd
+
+    t = doc.add_table(rows=total, cols=6)
+    t.style = 'Table Grid'
+
+    headers = [
+        "Variable", "Definición Conceptual", "Definición Operacional",
+        "Dimensión", "Indicador", "Escala de Medición"
+    ]
+    for i, h in enumerate(headers):
+        c = t.rows[0].cells[i]
+        c.text = h
+        _set_cell_bg(c, '1e3a5f')
+        for para in c.paragraphs:
+            for run in para.runs:
+                run.bold = True
+                run.font.size = _Pt(8)
+                run.font.color.rgb = RGBColor(0xff, 0xff, 0xff)
+
+    def _fill_row(row_obj, col0, col1, col2, dim, ind, esc):
+        vals = [col0, col1, col2, dim, ind, esc]
+        for ci, val in enumerate(vals):
+            c = row_obj.cells[ci]
+            c.text = val
+            for para in c.paragraphs:
+                for run in para.runs:
+                    run.font.size = _Pt(8)
+                    run.font.name = 'Arial Narrow'
+
+    # VI rows
+    for i, (dim, ind, esc) in enumerate(vi_dims):
+        row_obj = t.rows[1 + i]
+        c0 = f"Independiente:\n{vi}" if i == 0 else ""
+        c1 = vi_def_c if i == 0 else ""
+        c2 = vi_def_o if i == 0 else ""
+        _fill_row(row_obj, c0, c1, c2, dim, ind, esc)
+
+    # Merge VI cols 0,1,2
+    if n_vi > 1:
+        t.cell(1, 0).merge(t.cell(n_vi, 0))
+        t.cell(1, 1).merge(t.cell(n_vi, 1))
+        t.cell(1, 2).merge(t.cell(n_vi, 2))
+
+    # VD rows
+    vd_start = 1 + n_vi
+    for i, (dim, ind, esc) in enumerate(vd_dims):
+        row_obj = t.rows[vd_start + i]
+        c0 = f"Dependiente:\n{vd}" if i == 0 else ""
+        c1 = vd_def_c if i == 0 else ""
+        c2 = vd_def_o if i == 0 else ""
+        _fill_row(row_obj, c0, c1, c2, dim, ind, esc)
+
+    # Merge VD cols 0,1,2
+    if n_vd > 1:
+        t.cell(vd_start, 0).merge(t.cell(vd_start + n_vd - 1, 0))
+        t.cell(vd_start, 1).merge(t.cell(vd_start + n_vd - 1, 1))
+        t.cell(vd_start, 2).merge(t.cell(vd_start + n_vd - 1, 2))
+
+    return t
 
 
 # ── Contenido: Proyecto de Tesis ───────────────────────────────────────────────
@@ -1769,8 +2161,6 @@ def _content_proyecto_tesis(title: str, rl: str) -> dict:
 
     sec['cronograma_rows'] = _tabla_cronograma(title)
     sec['presupuesto_rows'] = _tabla_presupuesto(title)
-    sec['consistencia_rows'] = _tabla_consistencia(title, sec.get('obj_esp', []))
-    sec['operacionalizacion_rows'] = _tabla_operacionalizacion(title)
 
     return sec
 
@@ -2048,12 +2438,7 @@ def _build_pdf_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path: 
     sp(8)
     p("2.1 Variables y Operacionalización", 'h2')
     sp(6)
-    op_rows = sec.get('operacionalizacion_rows', _tabla_operacionalizacion(data['title']))
-    tbl(
-        ["Variable", "Definición conceptual", "Dimensión", "Indicador", "Escala", "Instrumento"],
-        op_rows,
-        [2.5*cm, 3*cm, 2.5*cm, 3*cm, 1.8*cm, 3*cm],
-    )
+    _pdf_operacionalizacion_table(story, data['title'])
     br()
 
     # ── CAPÍTULO III: ASPECTOS ADMINISTRATIVOS
@@ -2089,15 +2474,16 @@ def _build_pdf_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path: 
     p("ANEXOS", 'h1')
     sp(10)
     p("Anexo 1: Matriz de Consistencia", 'h2')
+    sp(4)
+    p(f"Título: \"{data['title']}\"", 'n')
     sp(6)
-    cons_rows = sec.get('consistencia_rows', _tabla_consistencia(data['title'], sec.get('obj_esp', [])))
-    tbl(
-        ["Problema", "Objetivo específico", "Hipótesis", "Variable", "Indicador", "Instrumento", "Diseño"],
-        cons_rows,
-        [2.5*cm, 2.5*cm, 2.5*cm, 2*cm, 2.5*cm, 2.5*cm, 2*cm],
-    )
+    _pdf_consistencia_table(story, data['title'], sec)
     sp(20)
-    p("Anexo 2: Declaración Jurada de Autoría", 'h2')
+    p("Anexo 2: Operacionalización de Variables", 'h2')
+    sp(6)
+    _pdf_operacionalizacion_table(story, data['title'])
+    sp(20)
+    p("Anexo 3: Declaración Jurada de Autoría", 'h2')
     sp(10)
     p(
         f"Yo/Nosotros, {', '.join(authors)}, declaro/declaramos bajo juramento que el proyecto "
@@ -2231,11 +2617,7 @@ def _build_docx_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path:
     add_h("CAPÍTULO II: MARCO METODOLÓGICO", 1)
     add_para(sec.get('cap2_proyecto', ''))
     add_h("2.1 Operacionalización de Variables", 2)
-    op_rows = sec.get('operacionalizacion_rows', _tabla_operacionalizacion(data['title']))
-    add_table_docx(
-        ["Variable", "Definición conceptual", "Dimensión", "Indicador", "Escala", "Instrumento"],
-        op_rows,
-    )
+    _docx_operacionalizacion_table(doc, data['title'])
     doc.add_page_break()
 
     # Cap III
@@ -2260,12 +2642,13 @@ def _build_docx_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path:
     # Anexos
     add_h("ANEXOS", 1)
     add_h("Anexo 1: Matriz de Consistencia", 2)
-    cons_rows = sec.get('consistencia_rows', _tabla_consistencia(data['title'], sec.get('obj_esp', [])))
-    add_table_docx(
-        ["Problema", "Objetivo esp.", "Hipótesis", "Variable", "Indicador", "Instrumento", "Diseño"],
-        cons_rows,
-    )
-    add_h("Anexo 2: Declaración Jurada de Autoría", 2)
+    add_para(f"Título: \"{data['title']}\"")
+    _docx_consistencia_table(doc, data['title'], sec)
+    doc.add_paragraph()
+    add_h("Anexo 2: Operacionalización de Variables", 2)
+    _docx_operacionalizacion_table(doc, data['title'])
+    doc.add_paragraph()
+    add_h("Anexo 3: Declaración Jurada de Autoría", 2)
     add_para(
         f"Yo/Nosotros, {', '.join(authors)}, declaro/declaramos bajo juramento que el proyecto "
         f"«{data['title']}» es de nuestra autoría y no ha sido plagiado."
@@ -2532,31 +2915,24 @@ def _build_pdf_from_template(data: dict, template_structure: dict, all_sec: dict
                 tbl(["Descripción", "Cantidad", "Precio unit.", "Total"], pres_rows,
                     [7*cm, 3*cm, 3.5*cm, 3*cm])
                 sp(12)
-            elif any(k in norm_title for k in ['operacionaliz', 'operacionalizacion']):
-                op_rows = all_sec.get('operacionalizacion_rows', _tabla_operacionalizacion(title))
-                tbl(["Variable", "Definición", "Dimensión", "Indicador", "Escala", "Instrumento"], op_rows,
-                    [2.5*cm, 3*cm, 2.5*cm, 3*cm, 1.8*cm, 2.7*cm])
+            elif any(k in norm_title for k in ['operacionaliz']):
+                _pdf_operacionalizacion_table(story, title)
                 sp(12)
             elif any(k in norm_title for k in ['consistencia', 'matriz']):
-                cons_rows = all_sec.get('consistencia_rows', _tabla_consistencia(title, all_sec.get('obj_esp', [])))
-                tbl(["Problema", "Objetivo", "Hipótesis", "Variable", "Indicador", "Instrumento", "Diseño"], cons_rows,
-                    [2.5*cm, 2.5*cm, 2.5*cm, 2*cm, 2.5*cm, 2.5*cm, 1.5*cm])
+                _pdf_consistencia_table(story, title, all_sec)
                 sp(12)
             elif table_idx < len(tables_in_template):
                 tpl_table = tables_in_template[table_idx]
                 tpl_type  = tpl_table.get('type', 'generic')
                 if tpl_type == 'cronograma':
-                    cron_rows = _tabla_cronograma(title)
-                    tbl(["Actividad", "Mes 1", "Mes 2", "Mes 3", "Mes 4", "Mes 5", "Mes 6"], cron_rows)
+                    tbl(["Actividad", "Mes 1", "Mes 2", "Mes 3", "Mes 4", "Mes 5", "Mes 6"],
+                        _tabla_cronograma(title))
                 elif tpl_type == 'presupuesto':
-                    pres_rows = _tabla_presupuesto(title)
-                    tbl(["Descripción", "Cantidad", "Precio unit.", "Total"], pres_rows)
+                    tbl(["Descripción", "Cantidad", "Precio unit.", "Total"], _tabla_presupuesto(title))
                 elif tpl_type == 'operacionalizacion':
-                    op_rows = _tabla_operacionalizacion(title)
-                    tbl(["Variable", "Definición", "Dimensión", "Indicador", "Escala", "Instrumento"], op_rows)
+                    _pdf_operacionalizacion_table(story, title)
                 elif tpl_type == 'consistencia':
-                    cons_rows = _tabla_consistencia(title, all_sec.get('obj_esp', []))
-                    tbl(["Problema", "Objetivo", "Hipótesis", "Variable", "Indicador", "Instrumento", "Diseño"], cons_rows)
+                    _pdf_consistencia_table(story, title, all_sec)
                 table_idx += 1
 
             if level == 1:
@@ -2661,15 +3037,9 @@ def _build_docx_from_template(data: dict, template_structure: dict, all_sec: dic
                     all_sec.get('presupuesto_rows', _tabla_presupuesto(title)),
                 )
             elif any(k in norm_title for k in ['operacionaliz']):
-                add_table_docx(
-                    ["Variable", "Definición", "Dimensión", "Indicador", "Escala", "Instrumento"],
-                    all_sec.get('operacionalizacion_rows', _tabla_operacionalizacion(title)),
-                )
+                _docx_operacionalizacion_table(doc, title)
             elif any(k in norm_title for k in ['consistencia', 'matriz']):
-                add_table_docx(
-                    ["Problema", "Objetivo", "Hipótesis", "Variable", "Indicador", "Instrumento", "Diseño"],
-                    all_sec.get('consistencia_rows', _tabla_consistencia(title, all_sec.get('obj_esp', []))),
-                )
+                _docx_consistencia_table(doc, title, all_sec)
 
             if level == 1:
                 doc.add_page_break()
