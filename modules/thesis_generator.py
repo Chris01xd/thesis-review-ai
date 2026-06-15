@@ -388,62 +388,219 @@ def _intro_text(data: dict, refs: list) -> str:
     }
 
 
-def _arbol_problemas(title: str) -> list:
-    """Retorna una representación textual del árbol de problemas."""
-    t = title.lower()
-    t_cap = title.split()[0].capitalize() if title.split() else "El problema"
-    return [
-        ("ÁRBOL DE PROBLEMAS", "h2"),
-        ("EFECTOS (consecuencias del problema central)", "h3"),
-        (f"→ Baja calidad y eficiencia en los procesos relacionados con {t}", "ind"),
-        (f"    → Incremento de costos operativos y tiempos de respuesta", "ind2"),
-        (f"    → Insatisfacción de los usuarios y beneficiarios del servicio", "ind2"),
-        (f"→ Pérdida de competitividad institucional", "ind"),
-        (f"    → Dificultad para cumplir estándares de calidad exigidos", "ind2"),
-        (f"    → Desventaja frente a organizaciones que sí han adoptado soluciones modernas", "ind2"),
-        ("", "sp"),
-        ("PROBLEMA CENTRAL", "h3"),
-        (f"Deficiencias en la gestión e implementación de {t} en las organizaciones del ámbito de estudio, que limitan la eficiencia operativa y la calidad de los servicios.", "n"),
-        ("", "sp"),
-        ("CAUSAS (origen del problema central)", "h3"),
-        (f"→ Ausencia de un sistema o solución tecnológica adecuada para {t}", "ind"),
-        (f"    → Inexistencia de herramientas especializadas adaptadas al contexto", "ind2"),
-        (f"    → Falta de inversión en infraestructura tecnológica", "ind2"),
-        (f"→ Limitado conocimiento técnico del personal", "ind"),
-        (f"    → Escasa capacitación en metodologías y herramientas modernas", "ind2"),
-        (f"    → Alta rotación de personal técnico especializado", "ind2"),
-        (f"→ Deficiencias en los procesos de planificación y gestión institucional", "ind"),
-        (f"    → Ausencia de indicadores de seguimiento y control", "ind2"),
-        (f"    → Falta de políticas claras para la adopción de tecnología", "ind2"),
+def _arbol_data(title: str, tipo: str) -> dict:
+    """Retorna datos estructurados para árbol de problemas u objetivos."""
+    vi, vd = _extract_vi_vd(title)
+    if tipo == 'problemas':
+        return {
+            'titulo': 'ARBOL DE PROBLEMAS  (Analisis Causa - Efecto)',
+            'top_label': 'E F E C T O S',
+            'bottom_label': 'C A U S A S',
+            'center_label': 'PROBLEMA CENTRAL',
+            'center_text': (
+                f"Deficiente gestion de {vd.lower()} ante la ausencia de {vi.lower()}, "
+                f"que genera ineficiencias operativas y reduce la calidad de los resultados "
+                f"en las organizaciones del ambito de estudio."
+            ),
+            'top': [
+                f"Incremento de costos operativos y tiempos de respuesta en {vd.lower()}",
+                f"Baja calidad en los procesos relacionados con {vd.lower()}",
+                f"Insatisfaccion de usuarios y perdida de competitividad institucional",
+            ],
+            'bottom': [
+                f"Ausencia de {vi.lower()} adecuado al contexto institucional",
+                f"Procesos manuales ineficientes y propensos a errores en {vd.lower()}",
+                f"Escasa capacitacion del personal y limitada inversion tecnologica",
+            ],
+        }
+    else:
+        return {
+            'titulo': 'ARBOL DE OBJETIVOS  (Analisis Medios - Fines)',
+            'top_label': 'F I N E S',
+            'bottom_label': 'M E D I O S',
+            'center_label': 'OBJETIVO CENTRAL',
+            'center_text': (
+                f"Desarrollar e implementar {vi.lower()} para mejorar la eficiencia "
+                f"operativa y elevar la calidad de {vd.lower()} en las organizaciones "
+                f"del ambito de estudio."
+            ),
+            'top': [
+                f"Reduccion de costos operativos y tiempos de respuesta en {vd.lower()}",
+                f"Alta calidad en los procesos relacionados con {vd.lower()}",
+                f"Satisfaccion de usuarios y mejora de la competitividad institucional",
+            ],
+            'bottom': [
+                f"Diseno e implementacion de {vi.lower()} para el contexto institucional",
+                f"Automatizacion y optimizacion de los procesos relacionados con {vd.lower()}",
+                f"Capacitacion del personal y fortalecimiento de la infraestructura tecnologica",
+            ],
+        }
+
+
+def _pdf_arbol_diagram(story: list, title: str, tipo: str):
+    """Genera diagrama visual de arbol (caja de colores jerarquica) para PDF."""
+    from reportlab.platypus import Table as _T, TableStyle as _TS, Paragraph as _P
+    from reportlab.lib import colors as _c
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER
+
+    _register_fonts()
+    d = _arbol_data(title, tipo)
+
+    PAGE_W = 21 * cm - ML - MR
+    cw = PAGE_W / 3
+
+    # Paleta de colores segun tipo
+    if tipo == 'problemas':
+        c_top = _c.HexColor('#d9780b')   # naranja: efectos
+        c_ctr = _c.HexColor('#7b1e1e')   # rojo oscuro: problema central
+        c_bot = _c.HexColor('#1e567b')   # azul acero: causas
+    else:
+        c_top = _c.HexColor('#2d7a4a')   # verde: fines
+        c_ctr = _c.HexColor('#1a5c3a')   # verde oscuro: objetivo central
+        c_bot = _c.HexColor('#1e3a7b')   # azul oscuro: medios
+
+    c_hdr = _c.HexColor('#1e3a5f')
+    c_lbl = _c.HexColor('#dde3ea')
+    c_arr = _c.HexColor('#f0f2f5')
+    W = _c.white
+    D = _c.HexColor('#1e3a5f')
+
+    def Ps(txt, sz=9, bold=False, col=_c.black):
+        safe = str(txt).replace('&', '&amp;').replace('\n', '<br/>')
+        st = ParagraphStyle(
+            f'arb{tipo}{sz}{int(bold)}',
+            fontName=_FB if bold else _F, fontSize=sz, leading=sz + 4,
+            alignment=TA_CENTER, textColor=col, spaceAfter=0, spaceBefore=0,
+        )
+        return _P(safe, st)
+
+    rows = [
+        [Ps(d['titulo'], 10, True, W), '', ''],
+        [Ps(d['top_label'], 8, True, D), '', ''],
+        [Ps(d['top'][0], 8, col=W), Ps(d['top'][1], 8, col=W), Ps(d['top'][2], 8, col=W)],
+        [Ps('v        v        v', 10, col=_c.HexColor('#555555')), '', ''],
+        [Ps(d['center_label'] + '\n\n' + d['center_text'], 9, True, W), '', ''],
+        [Ps('v        v        v', 10, col=_c.HexColor('#555555')), '', ''],
+        [Ps(d['bottom'][0], 8, col=W), Ps(d['bottom'][1], 8, col=W), Ps(d['bottom'][2], 8, col=W)],
+        [Ps(d['bottom_label'], 8, True, D), '', ''],
     ]
 
+    cmds = [
+        ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
+        ('TOPPADDING',    (0, 0), (-1, -1), 8),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 8),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 6),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 6),
+        ('GRID',          (0, 0), (-1, -1), 0.5, _c.HexColor('#8899aa')),
+        ('BOX',           (0, 0), (-1, -1), 1.5, c_hdr),
+        # SPANs filas completas
+        ('SPAN', (0, 0), (2, 0)),
+        ('SPAN', (0, 1), (2, 1)),
+        ('SPAN', (0, 3), (2, 3)),
+        ('SPAN', (0, 4), (2, 4)),
+        ('SPAN', (0, 5), (2, 5)),
+        ('SPAN', (0, 7), (2, 7)),
+        # Fondos
+        ('BACKGROUND', (0, 0), (2, 0), c_hdr),
+        ('BACKGROUND', (0, 1), (2, 1), c_lbl),
+        ('BACKGROUND', (0, 2), (2, 2), c_top),
+        ('BACKGROUND', (0, 3), (2, 3), c_arr),
+        ('BACKGROUND', (0, 4), (2, 4), c_ctr),
+        ('BACKGROUND', (0, 5), (2, 5), c_arr),
+        ('BACKGROUND', (0, 6), (2, 6), c_bot),
+        ('BACKGROUND', (0, 7), (2, 7), c_lbl),
+        # Filas de flecha delgadas
+        ('TOPPADDING',    (0, 3), (2, 3), 4),
+        ('BOTTOMPADDING', (0, 3), (2, 3), 4),
+        ('TOPPADDING',    (0, 5), (2, 5), 4),
+        ('BOTTOMPADDING', (0, 5), (2, 5), 4),
+    ]
+
+    t = _T(rows, colWidths=[cw, cw, cw])
+    t.setStyle(_TS(cmds))
+    story.append(t)
+
+
+def _docx_arbol_diagram(doc, title: str, tipo: str):
+    """Genera diagrama visual de arbol (tabla coloreada) para DOCX."""
+    d = _arbol_data(title, tipo)
+
+    if tipo == 'problemas':
+        c_top = 'd9780b'
+        c_ctr = '7b1e1e'
+        c_bot = '1e567b'
+    else:
+        c_top = '2d7a4a'
+        c_ctr = '1a5c3a'
+        c_bot = '1e3a7b'
+
+    c_hdr = '1e3a5f'
+    c_lbl = 'dde3ea'
+    c_arr = 'f0f2f5'
+
+    tbl = doc.add_table(rows=8, cols=3)
+    tbl.style = 'Table Grid'
+
+    def fill_cell(cell, lines, bg, bold=False, white_txt=False, sz=8):
+        """Rellena una celda con texto y color de fondo."""
+        # Limpiar contenido existente
+        for p in cell.paragraphs[1:]:
+            p._element.getparent().remove(p._element)
+        cell.paragraphs[0].clear()
+        for i, line in enumerate(lines if isinstance(lines, list) else [lines]):
+            para = cell.paragraphs[0] if i == 0 else cell.add_paragraph()
+            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = para.add_run(str(line))
+            run.bold = bold
+            run.font.size = _Pt(sz)
+            run.font.name = 'Arial Narrow'
+            if white_txt:
+                run.font.color.rgb = RGBColor(0xff, 0xff, 0xff)
+            elif bg == c_lbl:
+                run.font.color.rgb = RGBColor(0x1e, 0x3a, 0x5f)
+        _set_cell_bg(cell, bg)
+
+    # Filas 0,1,3,4,5,7 abarcan las 3 columnas → merge primero
+    for r in (0, 1, 3, 4, 5, 7):
+        tbl.cell(r, 0).merge(tbl.cell(r, 2))
+
+    # Fila 0: titulo
+    fill_cell(tbl.cell(0, 0), d['titulo'], c_hdr, bold=True, white_txt=True, sz=10)
+
+    # Fila 1: etiqueta superior
+    fill_cell(tbl.cell(1, 0), d['top_label'], c_lbl, bold=True, sz=8)
+
+    # Fila 2: 3 cajas superiores
+    for ci, txt in enumerate(d['top']):
+        fill_cell(tbl.rows[2].cells[ci], txt, c_top, white_txt=True, sz=8)
+
+    # Fila 3: flechas
+    fill_cell(tbl.cell(3, 0), 'v                    v                    v', c_arr, sz=9)
+
+    # Fila 4: caja central
+    fill_cell(tbl.cell(4, 0),
+              [d['center_label'], d['center_text']],
+              c_ctr, bold=True, white_txt=True, sz=9)
+
+    # Fila 5: flechas
+    fill_cell(tbl.cell(5, 0), 'v                    v                    v', c_arr, sz=9)
+
+    # Fila 6: 3 cajas inferiores
+    for ci, txt in enumerate(d['bottom']):
+        fill_cell(tbl.rows[6].cells[ci], txt, c_bot, white_txt=True, sz=8)
+
+    # Fila 7: etiqueta inferior
+    fill_cell(tbl.cell(7, 0), d['bottom_label'], c_lbl, bold=True, sz=8)
+
+
+# Mantener alias para compatibilidad con código heredado
+def _arbol_problemas(title: str) -> list:
+    return []
 
 def _arbol_objetivos(title: str) -> list:
-    t = title.lower()
-    return [
-        ("ÁRBOL DE OBJETIVOS", "h2"),
-        ("FINES (situación deseada tras alcanzar los objetivos)", "h3"),
-        (f"→ Alta calidad y eficiencia en los procesos relacionados con {t}", "ind"),
-        (f"    → Reducción de costos operativos y tiempos de respuesta", "ind2"),
-        (f"    → Satisfacción de los usuarios y beneficiarios del servicio", "ind2"),
-        (f"→ Mejora de la competitividad institucional", "ind"),
-        (f"    → Cumplimiento de estándares internacionales de calidad", "ind2"),
-        (f"    → Posicionamiento estratégico frente a organizaciones del sector", "ind2"),
-        ("", "sp"),
-        ("OBJETIVO CENTRAL", "h3"),
-        (f"Desarrollar e implementar {t} para mejorar la eficiencia operativa y la calidad de los servicios en las organizaciones del ámbito de estudio.", "n"),
-        ("", "sp"),
-        ("MEDIOS (acciones para alcanzar el objetivo central)", "h3"),
-        (f"→ Diseño e implementación de una solución tecnológica para {t}", "ind"),
-        (f"    → Desarrollo de componentes funcionales adaptados al contexto", "ind2"),
-        (f"    → Inversión en infraestructura tecnológica adecuada", "ind2"),
-        (f"→ Fortalecimiento de capacidades del personal", "ind"),
-        (f"    → Programas de capacitación en metodologías y herramientas modernas", "ind2"),
-        (f"    → Implementación de un plan de gestión del conocimiento", "ind2"),
-        (f"→ Mejora de los procesos de planificación y gestión institucional", "ind"),
-        (f"    → Establecimiento de indicadores de seguimiento y control (KPIs)", "ind2"),
-        (f"    → Definición de políticas institucionales para la adopción de tecnología", "ind2"),
-    ]
+    return []
 
 
 # ── Resumen / Abstract ───────────────────────────────────────────────────────
@@ -1289,22 +1446,12 @@ def _build_pdf(data: dict, sec: dict, refs: list, uid: str, logo_path: str = Non
     sp(10)
     p("Anexo 1: Árbol de Problemas", 'h2')
     sp(8)
-    for text, style in _arbol_problemas(data['title']):
-        if style == 'sp':
-            sp(12)
-        else:
-            p(text, style)
-            sp(2)
+    _pdf_arbol_diagram(story, data['title'], 'problemas')
     br()
 
     p("Anexo 2: Árbol de Objetivos", 'h2')
     sp(8)
-    for text, style in _arbol_objetivos(data['title']):
-        if style == 'sp':
-            sp(12)
-        else:
-            p(text, style)
-            sp(2)
+    _pdf_arbol_diagram(story, data['title'], 'objetivos')
     br()
 
     # ── 7. DECLARACIÓN JURADA ─────────────────────────────────────────────────
@@ -1531,17 +1678,13 @@ def _build_docx(data: dict, sec: dict, refs: list, uid: str, logo_path: str = No
         para.paragraph_format.first_line_indent = _Cm(-1.2)
     add_page_break()
 
-    # Árboles
+    # Árboles (diagramas visuales)
     add_heading("ANEXO 1: ÁRBOL DE PROBLEMAS", 2)
-    for text, style in _arbol_problemas(data['title']):
-        if style not in ('sp',):
-            add_para(text, bold=style in ('h2','h3'), indent=style in ('ind','ind2'))
+    _docx_arbol_diagram(doc, data['title'], 'problemas')
 
     add_page_break()
     add_heading("ANEXO 2: ÁRBOL DE OBJETIVOS", 2)
-    for text, style in _arbol_objetivos(data['title']):
-        if style not in ('sp',):
-            add_para(text, bold=style in ('h2','h3'), indent=style in ('ind','ind2'))
+    _docx_arbol_diagram(doc, data['title'], 'objetivos')
 
     add_page_break()
     add_heading("ANEXO 3: DECLARACIÓN JURADA", 2)
@@ -2473,17 +2616,25 @@ def _build_pdf_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path: 
     # ── ANEXOS
     p("ANEXOS", 'h1')
     sp(10)
-    p("Anexo 1: Matriz de Consistencia", 'h2')
+    p("Anexo 1: Árbol de Problemas", 'h2')
+    sp(6)
+    _pdf_arbol_diagram(story, data['title'], 'problemas')
+    sp(20)
+    p("Anexo 2: Árbol de Objetivos", 'h2')
+    sp(6)
+    _pdf_arbol_diagram(story, data['title'], 'objetivos')
+    sp(20)
+    p("Anexo 3: Matriz de Consistencia", 'h2')
     sp(4)
     p(f"Título: \"{data['title']}\"", 'n')
     sp(6)
     _pdf_consistencia_table(story, data['title'], sec)
     sp(20)
-    p("Anexo 2: Operacionalización de Variables", 'h2')
+    p("Anexo 4: Operacionalización de Variables", 'h2')
     sp(6)
     _pdf_operacionalizacion_table(story, data['title'])
     sp(20)
-    p("Anexo 3: Declaración Jurada de Autoría", 'h2')
+    p("Anexo 5: Declaración Jurada de Autoría", 'h2')
     sp(10)
     p(
         f"Yo/Nosotros, {', '.join(authors)}, declaro/declaramos bajo juramento que el proyecto "
@@ -2641,14 +2792,20 @@ def _build_docx_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path:
 
     # Anexos
     add_h("ANEXOS", 1)
-    add_h("Anexo 1: Matriz de Consistencia", 2)
+    add_h("Anexo 1: Árbol de Problemas", 2)
+    _docx_arbol_diagram(doc, data['title'], 'problemas')
+    doc.add_page_break()
+    add_h("Anexo 2: Árbol de Objetivos", 2)
+    _docx_arbol_diagram(doc, data['title'], 'objetivos')
+    doc.add_page_break()
+    add_h("Anexo 3: Matriz de Consistencia", 2)
     add_para(f"Título: \"{data['title']}\"")
     _docx_consistencia_table(doc, data['title'], sec)
     doc.add_paragraph()
-    add_h("Anexo 2: Operacionalización de Variables", 2)
+    add_h("Anexo 4: Operacionalización de Variables", 2)
     _docx_operacionalizacion_table(doc, data['title'])
     doc.add_paragraph()
-    add_h("Anexo 3: Declaración Jurada de Autoría", 2)
+    add_h("Anexo 5: Declaración Jurada de Autoría", 2)
     add_para(
         f"Yo/Nosotros, {', '.join(authors)}, declaro/declaramos bajo juramento que el proyecto "
         f"«{data['title']}» es de nuestra autoría y no ha sido plagiado."
@@ -2915,6 +3072,12 @@ def _build_pdf_from_template(data: dict, template_structure: dict, all_sec: dict
                 tbl(["Descripción", "Cantidad", "Precio unit.", "Total"], pres_rows,
                     [7*cm, 3*cm, 3.5*cm, 3*cm])
                 sp(12)
+            elif any(k in norm_title for k in ['arbol de prob', 'arbol prob', 'causa', 'causa efecto']):
+                _pdf_arbol_diagram(story, title, 'problemas')
+                sp(12)
+            elif any(k in norm_title for k in ['arbol de obj', 'arbol obj', 'medio', 'medio fin']):
+                _pdf_arbol_diagram(story, title, 'objetivos')
+                sp(12)
             elif any(k in norm_title for k in ['operacionaliz']):
                 _pdf_operacionalizacion_table(story, title)
                 sp(12)
@@ -3036,6 +3199,10 @@ def _build_docx_from_template(data: dict, template_structure: dict, all_sec: dic
                     ["Descripción", "Cantidad", "Precio unit.", "Total"],
                     all_sec.get('presupuesto_rows', _tabla_presupuesto(title)),
                 )
+            elif any(k in norm_title for k in ['arbol de prob', 'arbol prob', 'causa', 'causa efecto']):
+                _docx_arbol_diagram(doc, title, 'problemas')
+            elif any(k in norm_title for k in ['arbol de obj', 'arbol obj', 'medio', 'medio fin']):
+                _docx_arbol_diagram(doc, title, 'objetivos')
             elif any(k in norm_title for k in ['operacionaliz']):
                 _docx_operacionalizacion_table(doc, title)
             elif any(k in norm_title for k in ['consistencia', 'matriz']):
