@@ -603,6 +603,159 @@ def _arbol_objetivos(title: str) -> list:
     return []
 
 
+# ── Diagrama de Ishikawa / Espina de Pescado (Anexo 3 oficial UNT 2026) ───────
+
+def _ichikawa_data(title: str) -> dict:
+    vi, vd = _extract_vi_vd(title)
+    efecto = f"Deficiente gestión de {vd.lower()} ante la ausencia de {vi.lower()}"
+    return {
+        'efecto': efecto,
+        'causas': {
+            'PERSONAS': [
+                f"Escasa capacitación en {vd.lower()}",
+                "Alta rotación del personal responsable",
+                "Falta de compromiso institucional",
+            ],
+            'PROCESOS': [
+                f"Ausencia de estándares para {vi.lower()}",
+                "Procedimientos manuales sin sistematizar",
+                "Deficiente control de calidad interno",
+            ],
+            'TECNOLOGÍA': [
+                f"Sin sistema de {vi.lower()} implementado",
+                "Infraestructura tecnológica obsoleta",
+                "Falta de integración entre plataformas",
+            ],
+            'ENTORNO / AMBIENTE': [
+                "Cambios normativos frecuentes",
+                "Recursos financieros insuficientes",
+                "Demanda en constante variación",
+            ],
+        },
+    }
+
+
+def _pdf_ichikawa_diagram(story: list, title: str):
+    """Genera diagrama de Ishikawa como tabla visual 4-bloques para PDF."""
+    from reportlab.platypus import Paragraph as _P, Table as _T, TableStyle as _TS
+    from reportlab.lib import colors as _c
+    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.lib.enums import TA_CENTER, TA_LEFT
+
+    _register_fonts()
+    d = _ichikawa_data(title)
+
+    PAGE_W = 21*cm - ML - MR
+    col_w = PAGE_W / 2
+
+    c_hdr   = _c.HexColor('#1e3a5f')
+    c_efect = _c.HexColor('#8b1a1a')
+    c_pers  = _c.HexColor('#1e567b')
+    c_proc  = _c.HexColor('#2d7a4a')
+    c_tecn  = _c.HexColor('#7b5e1e')
+    c_entr  = _c.HexColor('#4a1e7b')
+
+    def Ps(txt, sz=8, bold=False, col=_c.black, align=TA_LEFT):
+        safe = str(txt).replace('&', '&amp;').replace('\n', '<br/>')
+        st = ParagraphStyle(
+            f'ichi{sz}{int(bold)}',
+            fontName=_FB if bold else _F, fontSize=sz, leading=sz+3,
+            alignment=align, textColor=col, spaceAfter=0, spaceBefore=0,
+        )
+        return _P(safe, st)
+
+    def causa_txt(cat_color, categoria, items):
+        lines = f"<b>{categoria}</b><br/>" + "<br/>".join(f"• {it}" for it in items)
+        return lines
+
+    causas = d['causas']
+    cats = list(causas.keys())
+    colors_cat = [c_pers, c_proc, c_tecn, c_entr]
+
+    rows = [
+        [Ps("DIAGRAMA DE ISHIKAWA — Espina de Pescado (Análisis Causa–Efecto)", 10, True, _c.white, TA_CENTER), ''],
+        [Ps(causa_txt(colors_cat[0], cats[0], causas[cats[0]]), 8, col=_c.white),
+         Ps(causa_txt(colors_cat[1], cats[1], causas[cats[1]]), 8, col=_c.white)],
+        [Ps(f"<b>EFECTO / PROBLEMA CENTRAL</b><br/>{d['efecto']}", 9, True, _c.white, TA_CENTER), ''],
+        [Ps(causa_txt(colors_cat[2], cats[2], causas[cats[2]]), 8, col=_c.white),
+         Ps(causa_txt(colors_cat[3], cats[3], causas[cats[3]]), 8, col=_c.white)],
+    ]
+
+    row_h = [1*cm, 3*cm, 1.5*cm, 3*cm]
+
+    t = _T(rows, colWidths=[col_w, col_w], rowHeights=row_h)
+    t.setStyle(_TS([
+        ('SPAN',          (0, 0), (1, 0)),
+        ('SPAN',          (0, 2), (1, 2)),
+        ('BACKGROUND',    (0, 0), (1, 0), c_hdr),
+        ('BACKGROUND',    (0, 1), (0, 1), c_pers),
+        ('BACKGROUND',    (1, 1), (1, 1), c_proc),
+        ('BACKGROUND',    (0, 2), (1, 2), c_efect),
+        ('BACKGROUND',    (0, 3), (0, 3), c_tecn),
+        ('BACKGROUND',    (1, 3), (1, 3), c_entr),
+        ('VALIGN',        (0, 0), (-1, -1), 'MIDDLE'),
+        ('ALIGN',         (0, 0), (-1, -1), 'CENTER'),
+        ('TOPPADDING',    (0, 0), (-1, -1), 6),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 8),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 8),
+        ('BOX',           (0, 0), (-1, -1), 1.5, c_hdr),
+        ('GRID',          (0, 0), (-1, -1), 0.5, _c.HexColor('#ffffff')),
+    ]))
+    story.append(t)
+
+
+def _docx_ichikawa_diagram(doc, title: str):
+    """Genera diagrama de Ishikawa como tabla visual 4-bloques para DOCX."""
+    d = _ichikawa_data(title)
+
+    c_hdr   = '1e3a5f'
+    c_efect = '8b1a1a'
+    c_pers  = '1e567b'
+    c_proc  = '2d7a4a'
+    c_tecn  = '7b5e1e'
+    c_entr  = '4a1e7b'
+
+    causas = d['causas']
+    cats = list(causas.keys())
+    colors_cat = [c_pers, c_proc, c_tecn, c_entr]
+
+    tbl = doc.add_table(rows=4, cols=2)
+    tbl.style = 'Table Grid'
+
+    def fill_c(cell, lines, bg, bold=False, sz=9):
+        for p in cell.paragraphs[1:]:
+            p._element.getparent().remove(p._element)
+        cell.paragraphs[0].clear()
+        for i, line in enumerate(lines if isinstance(lines, list) else [lines]):
+            para = cell.paragraphs[0] if i == 0 else cell.add_paragraph()
+            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            run = para.add_run(str(line))
+            run.bold = bold
+            run.font.size = _Pt(sz)
+            run.font.name = 'Arial Narrow'
+            run.font.color.rgb = RGBColor(0xff, 0xff, 0xff)
+        _set_cell_bg(cell, bg)
+
+    # Row 0: header (merged)
+    tbl.cell(0, 0).merge(tbl.cell(0, 1))
+    fill_c(tbl.cell(0, 0), "DIAGRAMA DE ISHIKAWA — Espina de Pescado (Análisis Causa–Efecto)", c_hdr, bold=True, sz=11)
+
+    # Row 1: Personas | Procesos
+    for ci, (cat_idx, bg) in enumerate([(0, c_pers), (1, c_proc)]):
+        lines = [cats[cat_idx]] + [f"• {it}" for it in causas[cats[cat_idx]]]
+        fill_c(tbl.rows[1].cells[ci], lines, bg, sz=9)
+
+    # Row 2: Efecto (merged)
+    tbl.cell(2, 0).merge(tbl.cell(2, 1))
+    fill_c(tbl.cell(2, 0), ["EFECTO / PROBLEMA CENTRAL", d['efecto']], c_efect, bold=True, sz=10)
+
+    # Row 3: Tecnología | Entorno
+    for ci, (cat_idx, bg) in enumerate([(2, c_tecn), (3, c_entr)]):
+        lines = [cats[cat_idx]] + [f"• {it}" for it in causas[cats[cat_idx]]]
+        fill_c(tbl.rows[3].cells[ci], lines, bg, sz=9)
+
+
 # ── Resumen / Abstract ───────────────────────────────────────────────────────
 def _resumen(title: str, rl: str) -> str:
     t = title.lower()
@@ -1884,14 +2037,10 @@ def _set_cell_bg(cell, hex_color: str):
     tcPr.append(shd)
 
 
-# ── Matriz de Consistencia (4 columnas) ───────────────────────────────────────
+# ── Matriz de Consistencia (5 columnas — esquema oficial UNT 2026) ─────────────
 
 def _pdf_consistencia_table(story: list, title: str, sec: dict):
-    """
-    Agrega la Matriz de Consistencia al story ReportLab.
-    4 columnas: Problema | Objetivo | Hipótesis | Variables
-    Formato exacto de plantilla UNT.
-    """
+    """Agrega Matriz de Consistencia 5 cols al story ReportLab (Problema|Objetivos|Hipótesis|Variable|Metodología)."""
     from reportlab.platypus import Paragraph as _P, Table as _T, TableStyle as _TS
     from reportlab.lib import colors as _c
 
@@ -1903,43 +2052,44 @@ def _pdf_consistencia_table(story: list, title: str, sec: dict):
         f"Evaluar el efecto de {vi} en los indicadores de desempeño de {vd}",
     ])
     prob_gen = sec.get('prob', f"¿De qué manera {vi} incide en los indicadores de desempeño de {vd}?")
-    hip = sec.get('hip', f"La implementación de {vi} mejora significativamente los indicadores de {vd} (p < 0.05).")
+    hip_gen = sec.get('hip', f"La implementación de {vi} mejora significativamente los indicadores de {vd}.")
 
     prob_esps = [
         f"¿Cuál es el estado actual de {vd} antes de implementar {vi}?",
         f"¿En qué medida el diseño de {vi} satisface los requerimientos del área de estudio?",
         f"¿Cómo incide {vi} en los indicadores de desempeño de {vd}?",
     ]
-
-    st = _para_style_cell(8)
-
-    def P(txt):
-        safe = str(txt).replace('&', '&amp;').replace('\n', '<br/>')
-        return _P(safe, st)
-
-    prob_txt = (
-        "<b>General:</b><br/>" + str(prob_gen) + "<br/><br/>"
-        "<b>Específicos:</b><br/>" +
-        "<br/>".join(f"{i+1}. {p}" for i, p in enumerate(prob_esps[:3]))
+    hip_esps = [
+        f"H1: El diseño de {vi} mejora el nivel de satisfacción respecto a {vd}.",
+        f"H2: La implementación de {vi} reduce los tiempos de procesamiento en {vd}.",
+        f"H3: La aplicación de {vi} incrementa la eficiencia operativa de {vd}.",
+    ]
+    metod_txt = (
+        "<b>Método:</b> Cuantitativo<br/><b>Tipo:</b> Aplicada<br/>"
+        "<b>Diseño:</b> Pre-experimental<br/><b>Población:</b> Personal del área<br/>"
+        "<b>Muestra:</b> Por conveniencia<br/><b>Técnicas:</b> Encuesta, observación<br/>"
+        "<b>Análisis:</b> Estadística inferencial"
     )
-    obj_txt = (
-        "<b>General:</b><br/>" + str(obj_gen) + "<br/><br/>"
-        "<b>Específicos:</b><br/>" +
-        "<br/>".join(f"{i+1}. {o}" for i, o in enumerate(obj_esp[:3]))
-    )
-    hip_txt = (
-        f"<b>Ha:</b> {hip}<br/><br/>"
-        f"<b>H0:</b> La implementación de {vi} no mejora significativamente "
-        f"los indicadores de {vd} (p ≥ 0.05)."
-    )
-    var_txt = f"<b>Independiente:</b><br/>{vi}<br/><br/><b>Dependiente:</b><br/>{vd}"
+
+    st = _para_style_cell(7)
+
+    def P(html):
+        return _P(str(html), st)
 
     PAGE_W = 21*cm - ML - MR
-    cw = [PAGE_W / 4] * 4
+    cw = [PAGE_W*0.21, PAGE_W*0.21, PAGE_W*0.20, PAGE_W*0.17, PAGE_W*0.21]
+
+    prob_g = f"<b>Enunciado general:</b><br/>{prob_gen}"
+    prob_e = "<b>Específicos:</b><br/>" + "<br/>".join(f"{i+1}. {p}" for i, p in enumerate(prob_esps))
+    obj_g  = f"<b>General:</b><br/>{obj_gen}"
+    obj_e  = "<b>Específicos:</b><br/>" + "<br/>".join(f"{i+1}. {o}" for i, o in enumerate(obj_esp[:3]))
+    hip_g  = f"<b>Ha:</b> {hip_gen}<br/><b>H0:</b> La implementación de {vi} NO mejora los indicadores de {vd}."
+    hip_e  = "<b>Específicas:</b><br/>" + "<br/>".join(f"{i+1}. {h}" for i, h in enumerate(hip_esps))
 
     data = [
-        [P("<b>Problema</b>"), P("<b>Objetivo</b>"), P("<b>Hipótesis</b>"), P("<b>Variables</b>")],
-        [P(prob_txt), P(obj_txt), P(hip_txt), P(var_txt)],
+        [P("<b>Problema</b>"), P("<b>Objetivos</b>"), P("<b>Hipótesis</b>"), P("<b>Variable</b>"), P("<b>Metodología</b>")],
+        [P(prob_g), P(obj_g), P(hip_g), P(f"<b>Independiente:</b><br/>{vi}"), P(metod_txt)],
+        [P(prob_e), P(obj_e), P(hip_e), P(f"<b>Dependiente:</b><br/>{vd}"), P(metod_txt)],
     ]
 
     t = _T(data, colWidths=cw, repeatRows=1)
@@ -1947,25 +2097,21 @@ def _pdf_consistencia_table(story: list, title: str, sec: dict):
         ('BACKGROUND',    (0, 0), (-1, 0),  _c.HexColor('#1e3a5f')),
         ('TEXTCOLOR',     (0, 0), (-1, 0),  _c.white),
         ('FONTNAME',      (0, 0), (-1, 0),  _FB),
-        ('FONTSIZE',      (0, 0), (-1, -1), 8),
+        ('FONTSIZE',      (0, 0), (-1, -1), 7),
         ('ALIGN',         (0, 0), (-1, -1), 'LEFT'),
         ('VALIGN',        (0, 0), (-1, -1), 'TOP'),
         ('GRID',          (0, 0), (-1, -1), 0.5, _c.HexColor('#c0c8d8')),
-        ('TOPPADDING',    (0, 0), (-1, -1), 4),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
-        ('LEFTPADDING',   (0, 0), (-1, -1), 4),
-        ('RIGHTPADDING',  (0, 0), (-1, -1), 4),
+        ('TOPPADDING',    (0, 0), (-1, -1), 3),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
+        ('LEFTPADDING',   (0, 0), (-1, -1), 3),
+        ('RIGHTPADDING',  (0, 0), (-1, -1), 3),
         ('BACKGROUND',    (0, 1), (-1, -1), _c.white),
     ]))
     story.append(t)
 
 
 def _docx_consistencia_table(doc, title: str, sec: dict):
-    """
-    Agrega la Matriz de Consistencia a un DOCX.
-    4 columnas: Problema | Objetivo | Hipótesis | Variables
-    Formato exacto de plantilla UNT.
-    """
+    """Agrega Matriz de Consistencia 5 cols a DOCX (Problema|Objetivos|Hipótesis|Variable|Metodología)."""
     vi, vd = _extract_vi_vd(title)
     obj_gen = sec.get('obj_gen', f"Determinar la incidencia de {vi} sobre los indicadores de desempeño de {vd}.")
     obj_esp = sec.get('obj_esp', [
@@ -1974,32 +2120,28 @@ def _docx_consistencia_table(doc, title: str, sec: dict):
         f"Evaluar el efecto de {vi} en los indicadores de desempeño de {vd}",
     ])
     prob_gen = sec.get('prob', f"¿De qué manera {vi} incide en los indicadores de desempeño de {vd}?")
-    hip = sec.get('hip', f"La implementación de {vi} mejora significativamente los indicadores de {vd} (p < 0.05).")
+    hip_gen = sec.get('hip', f"La implementación de {vi} mejora significativamente los indicadores de {vd}.")
 
     prob_esps = [
         f"¿Cuál es el estado actual de {vd} antes de implementar {vi}?",
         f"¿En qué medida el diseño de {vi} satisface los requerimientos del área?",
         f"¿Cómo incide {vi} en los indicadores de desempeño de {vd}?",
     ]
+    hip_esps = [
+        f"H1: El diseño de {vi} mejora el nivel de satisfacción respecto a {vd}.",
+        f"H2: La implementación de {vi} reduce los tiempos de procesamiento.",
+        f"H3: La aplicación de {vi} incrementa la eficiencia operativa.",
+    ]
+    metod_cell = (
+        "Método: Cuantitativo\nTipo: Aplicada\nDiseño: Pre-experimental\n"
+        "Población: Personal del área\nMuestra: Por conveniencia\n"
+        "Técnicas: Encuesta, observación\nAnálisis: Estadística inferencial"
+    )
 
-    prob_cell = (
-        f"General:\n{prob_gen}\n\nEspecíficos:\n" +
-        "\n".join(f"{i+1}. {p}" for i, p in enumerate(prob_esps[:3]))
-    )
-    obj_cell = (
-        f"General:\n{obj_gen}\n\nEspecíficos:\n" +
-        "\n".join(f"{i+1}. {o}" for i, o in enumerate(obj_esp[:3]))
-    )
-    hip_cell = (
-        f"Ha: {hip}\n\n"
-        f"H0: La implementación de {vi} no mejora significativamente los indicadores (p ≥ 0.05)."
-    )
-    var_cell = f"Independiente:\n{vi}\n\nDependiente:\n{vd}"
-
-    t = doc.add_table(rows=2, cols=4)
+    t = doc.add_table(rows=3, cols=5)
     t.style = 'Table Grid'
 
-    headers = ["Problema", "Objetivo", "Hipótesis", "Variables"]
+    headers = ["Problema", "Objetivos", "Hipótesis", "Variable", "Metodología"]
     for i, h in enumerate(headers):
         c = t.rows[0].cells[i]
         c.text = h
@@ -2010,14 +2152,30 @@ def _docx_consistencia_table(doc, title: str, sec: dict):
                 run.font.size = _Pt(9)
                 run.font.color.rgb = RGBColor(0xff, 0xff, 0xff)
 
-    for i, txt in enumerate([prob_cell, obj_cell, hip_cell, var_cell]):
-        c = t.rows[1].cells[i]
-        c.text = txt
-        for para in c.paragraphs:
-            para.paragraph_format.space_after = _Pt(2)
-            for run in para.runs:
-                run.font.size = _Pt(8)
-                run.font.name = 'Arial Narrow'
+    row1_data = [
+        f"Enunciado general:\n{prob_gen}",
+        f"General:\n{obj_gen}",
+        f"Ha: {hip_gen}\nH0: La implementación de {vi} NO mejora los indicadores de {vd}.",
+        f"Independiente:\n{vi}",
+        metod_cell,
+    ]
+    row2_data = [
+        "Específicos:\n" + "\n".join(f"{i+1}. {p}" for i, p in enumerate(prob_esps)),
+        "Específicos:\n" + "\n".join(f"{i+1}. {o}" for i, o in enumerate(obj_esp[:3])),
+        "Específicas:\n" + "\n".join(f"{i+1}. {h}" for i, h in enumerate(hip_esps)),
+        f"Dependiente:\n{vd}",
+        metod_cell,
+    ]
+
+    for row_idx, row_data in enumerate([row1_data, row2_data], start=1):
+        for ci, txt in enumerate(row_data):
+            c = t.rows[row_idx].cells[ci]
+            c.text = txt
+            for para in c.paragraphs:
+                para.paragraph_format.space_after = _Pt(2)
+                for run in para.runs:
+                    run.font.size = _Pt(8)
+                    run.font.name = 'Arial Narrow'
 
     return t
 
@@ -2574,8 +2732,8 @@ def _build_pdf_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path: 
         p(str(lim_val), 'n')
     br()
 
-    # ── CAPÍTULO II: METODOLOGÍA
-    p("CAPÍTULO II: MARCO METODOLÓGICO", 'h1')
+    # ── CAPÍTULO II: MÉTODO
+    p("CAPÍTULO II: MÉTODO", 'h1')
     sp(10)
     p(sec.get('cap2_proyecto', ''), 'n')
     sp(8)
@@ -2613,28 +2771,32 @@ def _build_pdf_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path: 
         p(ref, 'ref')
     br()
 
-    # ── ANEXOS
+    # ── ANEXOS (orden oficial UNT 2026)
     p("ANEXOS", 'h1')
     sp(10)
-    p("Anexo 1: Árbol de Problemas", 'h2')
+    p("Anexo 1: Operacionalización de Variables", 'h2')
     sp(6)
-    _pdf_arbol_diagram(story, data['title'], 'problemas')
+    _pdf_operacionalizacion_table(story, data['title'])
     sp(20)
-    p("Anexo 2: Árbol de Objetivos", 'h2')
-    sp(6)
-    _pdf_arbol_diagram(story, data['title'], 'objetivos')
-    sp(20)
-    p("Anexo 3: Matriz de Consistencia", 'h2')
+    p("Anexo 2: Matriz de Consistencia", 'h2')
     sp(4)
     p(f"Título: \"{data['title']}\"", 'n')
     sp(6)
     _pdf_consistencia_table(story, data['title'], sec)
     sp(20)
-    p("Anexo 4: Operacionalización de Variables", 'h2')
+    p("Anexo 3: Diagrama de Ishikawa", 'h2')
     sp(6)
-    _pdf_operacionalizacion_table(story, data['title'])
+    _pdf_ichikawa_diagram(story, data['title'])
     sp(20)
-    p("Anexo 5: Declaración Jurada de Autoría", 'h2')
+    p("Anexo 4: Árbol de Problemas", 'h2')
+    sp(6)
+    _pdf_arbol_diagram(story, data['title'], 'problemas')
+    sp(20)
+    p("Anexo 5: Árbol de Objetivos", 'h2')
+    sp(6)
+    _pdf_arbol_diagram(story, data['title'], 'objetivos')
+    sp(20)
+    p("Anexo 6: Declaración Jurada de Autoría", 'h2')
     sp(10)
     p(
         f"Yo/Nosotros, {', '.join(authors)}, declaro/declaramos bajo juramento que el proyecto "
@@ -2765,7 +2927,7 @@ def _build_docx_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path:
     doc.add_page_break()
 
     # Cap II
-    add_h("CAPÍTULO II: MARCO METODOLÓGICO", 1)
+    add_h("CAPÍTULO II: MÉTODO", 1)
     add_para(sec.get('cap2_proyecto', ''))
     add_h("2.1 Operacionalización de Variables", 2)
     _docx_operacionalizacion_table(doc, data['title'])
@@ -2790,22 +2952,25 @@ def _build_docx_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path:
         add_para(ref)
     doc.add_page_break()
 
-    # Anexos
+    # Anexos (orden oficial UNT 2026)
     add_h("ANEXOS", 1)
-    add_h("Anexo 1: Árbol de Problemas", 2)
-    _docx_arbol_diagram(doc, data['title'], 'problemas')
+    add_h("Anexo 1: Operacionalización de Variables", 2)
+    _docx_operacionalizacion_table(doc, data['title'])
     doc.add_page_break()
-    add_h("Anexo 2: Árbol de Objetivos", 2)
-    _docx_arbol_diagram(doc, data['title'], 'objetivos')
-    doc.add_page_break()
-    add_h("Anexo 3: Matriz de Consistencia", 2)
+    add_h("Anexo 2: Matriz de Consistencia", 2)
     add_para(f"Título: \"{data['title']}\"")
     _docx_consistencia_table(doc, data['title'], sec)
-    doc.add_paragraph()
-    add_h("Anexo 4: Operacionalización de Variables", 2)
-    _docx_operacionalizacion_table(doc, data['title'])
-    doc.add_paragraph()
-    add_h("Anexo 5: Declaración Jurada de Autoría", 2)
+    doc.add_page_break()
+    add_h("Anexo 3: Diagrama de Ishikawa", 2)
+    _docx_ichikawa_diagram(doc, data['title'])
+    doc.add_page_break()
+    add_h("Anexo 4: Árbol de Problemas", 2)
+    _docx_arbol_diagram(doc, data['title'], 'problemas')
+    doc.add_page_break()
+    add_h("Anexo 5: Árbol de Objetivos", 2)
+    _docx_arbol_diagram(doc, data['title'], 'objetivos')
+    doc.add_page_break()
+    add_h("Anexo 6: Declaración Jurada de Autoría", 2)
     add_para(
         f"Yo/Nosotros, {', '.join(authors)}, declaro/declaramos bajo juramento que el proyecto "
         f"«{data['title']}» es de nuestra autoría y no ha sido plagiado."
@@ -3072,6 +3237,9 @@ def _build_pdf_from_template(data: dict, template_structure: dict, all_sec: dict
                 tbl(["Descripción", "Cantidad", "Precio unit.", "Total"], pres_rows,
                     [7*cm, 3*cm, 3.5*cm, 3*cm])
                 sp(12)
+            elif any(k in norm_title for k in ['ishikawa', 'ichikawa', 'espina', 'pescado']):
+                _pdf_ichikawa_diagram(story, title)
+                sp(12)
             elif any(k in norm_title for k in ['arbol de prob', 'arbol prob', 'causa', 'causa efecto']):
                 _pdf_arbol_diagram(story, title, 'problemas')
                 sp(12)
@@ -3199,6 +3367,8 @@ def _build_docx_from_template(data: dict, template_structure: dict, all_sec: dic
                     ["Descripción", "Cantidad", "Precio unit.", "Total"],
                     all_sec.get('presupuesto_rows', _tabla_presupuesto(title)),
                 )
+            elif any(k in norm_title for k in ['ishikawa', 'ichikawa', 'espina', 'pescado']):
+                _docx_ichikawa_diagram(doc, title)
             elif any(k in norm_title for k in ['arbol de prob', 'arbol prob', 'causa', 'causa efecto']):
                 _docx_arbol_diagram(doc, title, 'problemas')
             elif any(k in norm_title for k in ['arbol de obj', 'arbol obj', 'medio', 'medio fin']):
