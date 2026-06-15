@@ -3405,6 +3405,116 @@ def _set_docx_margins(doc):
 
 # ── PDF/DOCX basado en plantilla ──────────────────────────────────────────────
 
+def _is_instructional_text(full_content: str) -> bool:
+    """Heurística: el texto de una sección de plantilla es una instrucción, no contenido final."""
+    if not full_content or len(full_content) < 20:
+        return False
+    n = full_content.lower()
+    for c in 'áéíóú':
+        n = n.replace(c, 'aeiou'['áéíóú'.index(c)])
+    instruction_markers = [
+        # Verbos directivos
+        'debe contener', 'debe incluir', 'debe estar', 'debe ser',
+        'se debe', 'se deben', 'se redacta', 'se presenta', 'se indica',
+        'se especifica', 'se describe', 'se puede', 'se utiliza',
+        'indicar ', 'especificar', 'describir', 'explicar brevemente',
+        'redactar en', 'elaborar', 'desarrollar',
+        # Estructuras parentéticas instructivas típicas de plantillas UNT/APA
+        '(se ', '(debe', '(puede', '(comprende', '(incluye', '(indica',
+        '(en cuanto', '(de acuerdo', '(segun', '(numero',
+        # Opciones y ejemplos
+        'incluyendo:', 'incluir:', 'puede ser', 'tales como',
+        'por ejemplo', 'como por ejemplo', 'de acuerdo a', 'de acuerdo con',
+        # Limitaciones y cuantías
+        'no superar', 'minimo ', 'maximo ', 'entre ', 'al menos ',
+        # Tiempo verbal
+        'en tiempo pasado', 'en tiempo presente',
+        # Estilos
+        'apa 7', 'apa7', 'apa 6', 'vancouver', 'ieee',
+        # Recomendaciones
+        'se recomienda', 'se sugiere', 'utilizar solo', 'en formato',
+        # Placeholders
+        '[escriba', '[complete', '[nombre', '[apellido',
+        '(nombre', '(apellido', '(titulo', '(grado',
+        # Señales de plantilla formal
+        'tipo, nivel', 'palabras clave', 'nota:', 'nota :',
+        'tamano ', 'margenes', 'fuente:', 'interlineado',
+    ]
+    return any(mk in n for mk in instruction_markers)
+
+
+def _gen_section_with_instruction(
+    title: str,
+    rl: str,
+    sec_title: str,
+    full_content: str,
+    instructions: dict,
+    all_sec: dict,
+) -> str:
+    """
+    Genera el contenido de una sección siguiendo las instrucciones de la plantilla.
+    Usa OpenAI si las instrucciones son detalladas; si no, usa el generador estático.
+    """
+    # Primero intentar la asignación estática (secciones bien conocidas)
+    static_content = _map_section_to_content(sec_title, title, rl, all_sec)
+
+    # Si es una sección de tipo "skip" (retorna vacío por diseño) → respetar
+    norm = sec_title.lower()
+    for c in 'áéíóú':
+        norm = norm.replace(c, 'aeiou'['áéíóú'.index(c)])
+
+    skip_always = [
+        'indice', 'lista de figura', 'lista de tabla', 'cronograma', 'presupuesto',
+        'operacionalizacion', 'consistencia', 'ishikawa', 'ichikawa',
+        'arbol de prob', 'arbol de obj', 'arbol prob', 'arbol obj',
+        'referencia', 'anexo', 'portada', 'jurado', 'organizacion sincronica',
+    ]
+    if any(k in norm for k in skip_always):
+        return static_content  # '' para tablas/diagramas gestionados externamente
+
+    # Si el texto de la plantilla contiene instrucciones detalladas → usar OpenAI
+    if _is_instructional_text(full_content):
+        api_key = os.getenv('OPENAI_API_KEY', '')
+        if api_key:
+            try:
+                import openai
+                client = openai.OpenAI(api_key=api_key)
+
+                # Construir contexto de instrucciones
+                wc = instructions.get('word_count')
+                word_hint = f"Extensión: entre {wc['min']} y {wc['max']} palabras." if wc else ""
+                tense_hint = {
+                    'past': "Usa tiempo verbal pasado.",
+                    'present': "Usa tiempo verbal presente.",
+                }.get(instructions.get('tense', ''), '')
+                elems = instructions.get('required_elements', [])
+                elems_hint = ("Debe incluir: " + ", ".join(elems) + ".") if elems else ""
+
+                prompt = (
+                    f"Eres un experto en redacción académica en español. "
+                    f"Genera el contenido de la sección '{sec_title}' para un documento académico "
+                    f"titulado: «{title}». Línea de investigación: {rl or 'ingeniería y tecnología'}.\n\n"
+                    f"INSTRUCCIONES DE LA PLANTILLA:\n{full_content[:2000]}\n\n"
+                    f"{word_hint} {tense_hint} {elems_hint}\n\n"
+                    f"Responde SOLO con el texto de la sección, sin encabezados ni metadatos. "
+                    f"El contenido debe ser coherente, académico y específico para el tema."
+                )
+                resp = client.chat.completions.create(
+                    model=os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+                    messages=[{'role': 'user', 'content': prompt}],
+                    temperature=0.7,
+                    max_tokens=1200,
+                )
+                ai_text = resp.choices[0].message.content.strip()
+                if ai_text:
+                    return ai_text
+            except Exception as e:
+                print(f"[gen_section] OpenAI error para '{sec_title}': {e}")
+
+    # Fallback: contenido estático
+    return static_content
+
+
 def _build_pdf_from_template(data: dict, template_structure: dict, all_sec: dict,
                               refs: list, uid: str, logo_path: str = None) -> str:
     """Construye un PDF siguiendo la estructura de una plantilla analizada."""
@@ -3486,7 +3596,6 @@ def _build_pdf_from_template(data: dict, template_structure: dict, all_sec: dict
             p("CAPÍTULO I: EL PROBLEMA DE INVESTIGACIÓN", 'h1')
             p(_rp(title, rl), 'n'); p(_ant(title), 'n')
     else:
-        prev_level = 0
         for sec_item in sections:
             level = sec_item.get('level', 2)
             sec_title = sec_item.get('title', '')
@@ -3497,7 +3606,12 @@ def _build_pdf_from_template(data: dict, template_structure: dict, all_sec: dict
             p(sec_title, style_key)
             sp(6)
 
-            content = _map_section_to_content(sec_title, title, rl, all_sec)
+            # Usar instrucciones de la plantilla para guiar la generación de contenido
+            full_content = sec_item.get('full_content', '')
+            instructions = sec_item.get('instructions', {})
+            content = _gen_section_with_instruction(
+                title, rl, sec_title, full_content, instructions, all_sec
+            )
             if content:
                 if isinstance(content, list):
                     for item in content:
@@ -3554,9 +3668,11 @@ def _build_pdf_from_template(data: dict, template_structure: dict, all_sec: dict
                 br()
 
     # Referencias siempre al final
+    g_inst = template_structure.get('global_instructions', {})
+    n_ref_tpl = g_inst.get('min_refs') or 25
     p("REFERENCIAS BIBLIOGRÁFICAS", 'h1')
     sp(10)
-    for ref in refs[:25]:
+    for ref in refs[:max(n_ref_tpl, 25)]:
         p(ref, 'ref')
 
     doc.build(story)
@@ -3645,7 +3761,12 @@ def _build_docx_from_template(data: dict, template_structure: dict, all_sec: dic
 
             add_h(sec_title, min(level, 3))
 
-            content = _map_section_to_content(sec_title, title, rl, all_sec)
+            # Usar instrucciones de la plantilla para guiar la generación de contenido
+            full_content = sec_item.get('full_content', '')
+            instructions = sec_item.get('instructions', {})
+            content = _gen_section_with_instruction(
+                title, rl, sec_title, full_content, instructions, all_sec
+            )
             if content:
                 if isinstance(content, list):
                     for item in content:
@@ -3682,8 +3803,10 @@ def _build_docx_from_template(data: dict, template_structure: dict, all_sec: dic
                 doc.add_page_break()
 
     # Referencias
+    g_inst = template_structure.get('global_instructions', {})
+    n_ref_tpl = g_inst.get('min_refs') or 25
     add_h("REFERENCIAS BIBLIOGRÁFICAS", 1)
-    for ref in refs[:25]:
+    for ref in refs[:max(n_ref_tpl, 25)]:
         add_para(ref)
 
     doc.save(path)
@@ -3708,7 +3831,13 @@ def generate_document(data: dict) -> dict:
     doc_type = data.get('doc_type', 'tesis')
     template_structure = data.get('template_structure', None)
 
-    n_refs = 30 if doc_type == 'articulo' else 25
+    # Respetar el mínimo de referencias indicado por la plantilla
+    tpl_min_refs = 0
+    if template_structure:
+        g_inst = template_structure.get('global_instructions', {})
+        tpl_min_refs = g_inst.get('min_refs') or 0
+    base_refs = 30 if doc_type == 'articulo' else 25
+    n_refs = max(base_refs, tpl_min_refs)
     refs = _gen_references(title, n=n_refs)
 
     # Decodificar logo si viene en base64

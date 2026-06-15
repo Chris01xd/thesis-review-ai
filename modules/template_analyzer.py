@@ -49,6 +49,90 @@ def _normalize(text: str) -> str:
     return text
 
 
+def _parse_instructions(text: str) -> dict:
+    """
+    Extrae requisitos explícitos del texto instruccional de una sección de plantilla.
+    Retorna un dict con los requisitos identificados.
+    """
+    n = _normalize(text)
+    inst = {
+        'raw':              text,
+        'word_count':       None,
+        'tense':            None,
+        'citation_style':   None,
+        'min_refs':         None,
+        'max_refs':         None,
+        'pct_scientific':   None,
+        'years_recency':    None,
+        'required_elements': [],
+        'num_paragraphs':   None,
+        'paragraph_lines':  None,
+        'single_paragraph': False,
+        'numbered_sections': False,
+    }
+
+    # Conteo de palabras: "150 a 200 palabras" / "100 palabras"
+    m = re.search(r'(\d+)\s+a\s+(\d+)\s+palabras?', n)
+    if m:
+        inst['word_count'] = {'min': int(m.group(1)), 'max': int(m.group(2))}
+    else:
+        m = re.search(r'(\d+)\s+palabras?', n)
+        if m:
+            inst['word_count'] = {'min': int(m.group(1)), 'max': int(m.group(1))}
+
+    # Tiempo verbal
+    if 'tiempo pasado' in n:
+        inst['tense'] = 'past'
+    elif 'tiempo presente' in n:
+        inst['tense'] = 'present'
+
+    # Párrafo único
+    if 'un solo parrafo' in n or 'un parrafo' in n:
+        inst['single_paragraph'] = True
+
+    # Número de párrafos / líneas
+    m = re.search(r'no\s+superar\s+(\d+)\s+parrafo', n)
+    if m:
+        inst['num_paragraphs'] = int(m.group(1))
+    m = re.search(r'menor\s+a\s+(\d+)\s+lineas?', n)
+    if m:
+        inst['paragraph_lines'] = int(m.group(1))
+
+    # Estilo de citación
+    for style in ['apa 7', 'apa7', 'apa 6', 'apa', 'ieee', 'vancouver', 'chicago', 'apa septima']:
+        if style in n:
+            inst['citation_style'] = style.upper().replace('APA7','APA 7').replace('APA SEPTIMA','APA 7')
+            break
+
+    # Mínimo de referencias
+    m = re.search(r'(minimo|al menos|no menos de)\s+(\d+)\s+referencia', n)
+    if m:
+        inst['min_refs'] = int(m.group(2))
+
+    # Porcentaje artículos científicos
+    m = re.search(r'(\d+)\s*%\s+.*?articulo', n)
+    if m:
+        inst['pct_scientific'] = int(m.group(1))
+
+    # Antigüedad de referencias (últimos N años)
+    m = re.search(r'ultimos?\s+(\d+)\s+a[nñ]os?', n)
+    if m:
+        inst['years_recency'] = int(m.group(1))
+
+    # Subtítulos numerados ("se enumerarán progresivamente")
+    if 'numeraran' in n or 'numerados' in n or 'enumeraran' in n:
+        inst['numbered_sections'] = True
+
+    # Elementos requeridos: buscar listas de conceptos después de ":"
+    # Patrón: "incluyendo: X, Y, Z" / "debe incluir: X, Y, Z"
+    m = re.search(r'(?:incluyendo|debe incluir|incluir|contener)[:\s]+([^.]{10,200})', n)
+    if m:
+        raw_elements = re.split(r'[,;]', m.group(1))
+        inst['required_elements'] = [e.strip() for e in raw_elements if len(e.strip()) > 3]
+
+    return inst
+
+
 def _is_cover_section(text: str) -> bool:
     n = _normalize(text.strip())
     return any(kw in n for kw in _COVER_KEYWORDS)
@@ -74,9 +158,10 @@ def _analyze_docx(file_path: str) -> dict:
 
     sections = []
     tables_info = []
-    last_real_section_idx = -1   # índice del último heading real añadido
+    last_real_section_idx = -1
+    # Acumula el texto de los párrafos de contenido para cada sección
+    content_buffers: list[list[str]] = []
 
-    # Patrones de texto que indican heading aunque el estilo no lo sea
     _CHAPTER_PAT = re.compile(
         r'^(cap[ií]tulo\s+[ivxIVX\d]+[\.:].{0,80}|'
         r'anexo\s+\d+[\.:].{0,80}|'
@@ -86,7 +171,6 @@ def _analyze_docx(file_path: str) -> dict:
     )
 
     def _is_heading_style(style_name: str) -> tuple:
-        """Devuelve (True, level) si el estilo es de tipo heading."""
         sn = style_name.lower()
         for key in ('heading 1', 'título 1', 'titulo 1', 'heading1'):
             if key in sn: return True, 1
@@ -100,15 +184,23 @@ def _analyze_docx(file_path: str) -> dict:
         n = _normalize(text.strip())
         if re.match(r'^(cap[ií]tulo|anexo)\s+', n):
             return 1
-        if re.match(r'^\d+\s{2,}', text):   # "1    Introducción"
+        if re.match(r'^\d+\s{2,}', text):
             return 1
-        if re.match(r'^\d+\.\d+\s+', text): # "2.1 Algo"
+        if re.match(r'^\d+\.\d+\s+', text):
             return 2
-        if re.match(r'^\d+\.\d+\.\d+\s+', text): # "2.1.1 Algo"
+        if re.match(r'^\d+\.\d+\.\d+\s+', text):
             return 3
         if re.match(r'^[IVX]+\.\s+', text):
             return 1
         return 2
+
+    def _add_section(level: int, title: str):
+        nonlocal last_real_section_idx
+        sections.append({"level": level, "title": title,
+                         "content_preview": "", "full_content": "",
+                         "instructions": {}})
+        content_buffers.append([])
+        last_real_section_idx = len(sections) - 1
 
     for para in doc.paragraphs:
         style_name = para.style.name if para.style else ""
@@ -120,44 +212,49 @@ def _analyze_docx(file_path: str) -> dict:
 
         if is_heading:
             if not _is_cover_section(text):
-                sections.append({"level": level, "title": text, "content_preview": ""})
-                last_real_section_idx = len(sections) - 1
+                _add_section(level, text)
             continue
 
-        # Detectar por texto: ALL CAPS corto
         if text.isupper() and 5 < len(text) < 140:
             if _is_cover_section(text):
                 continue
-            level = _infer_level(text)
-            sections.append({"level": level, "title": text, "content_preview": ""})
-            last_real_section_idx = len(sections) - 1
+            _add_section(_infer_level(text), text)
             continue
 
-        # Detectar por patrón: "CAPÍTULO I:", "ANEXO 2:", "1  Introducción", etc.
         if _CHAPTER_PAT.match(text) and len(text) < 140:
             if _is_cover_section(text):
                 continue
-            level = _infer_level(text)
-            # Evitar duplicados con lo ya capturado
             if not sections or _normalize(sections[-1]['title']) != _normalize(text):
-                sections.append({"level": level, "title": text, "content_preview": ""})
-                last_real_section_idx = len(sections) - 1
+                _add_section(_infer_level(text), text)
             continue
 
-        # Detectar por formato: bold y corto (sub-heading probable)
         is_bold_short = (
             len(text) < 100 and
             para.runs and
             all(r.bold for r in para.runs if r.text.strip())
         )
         if is_bold_short and not _is_cover_section(text):
-            sections.append({"level": 3, "title": text, "content_preview": ""})
-            last_real_section_idx = len(sections) - 1
+            _add_section(3, text)
             continue
 
-        # Párrafo de contenido → asignar como preview del último heading
-        if last_real_section_idx >= 0 and not sections[last_real_section_idx]["content_preview"]:
-            sections[last_real_section_idx]["content_preview"] = text[:200]
+        # Párrafo de contenido — acumular en el buffer de la sección actual
+        if last_real_section_idx >= 0:
+            buf = content_buffers[last_real_section_idx]
+            # Limitar a 4000 chars totales para no explotar el contexto de OpenAI
+            total_so_far = sum(len(t) for t in buf)
+            if total_so_far < 4000:
+                buf.append(text)
+
+    # Finalizar: volcar buffers en full_content + content_preview + instructions
+    for i, sec in enumerate(sections):
+        full = "\n".join(content_buffers[i]).strip()
+        sec["full_content"]    = full[:4000]
+        sec["content_preview"] = full[:200]
+        sec["instructions"]    = _parse_instructions(full) if full else {}
+
+    # Extraer requisitos globales del documento (ej. estilo de citación)
+    all_content = "\n".join(s["full_content"] for s in sections)
+    global_instructions = _parse_instructions(all_content)
 
     for table in doc.tables:
         rows_count = len(table.rows)
@@ -180,6 +277,7 @@ def _analyze_docx(file_path: str) -> dict:
         "has_cover": _has_cover(doc),
         "has_abstract": _has_section(sections, ["resumen", "abstract"]),
         "doc_type_hint": _detect_doc_type(sections, tables_info),
+        "global_instructions": global_instructions,
     }
 
 
@@ -206,6 +304,7 @@ def _analyze_pdf(file_path: str) -> dict:
         all_text += (page.extract_text() or "") + "\n"
 
     sections = _extract_headings_from_text(all_text)
+    global_instructions = _parse_instructions(all_text[:8000])
 
     return {
         "sections": sections,
@@ -213,12 +312,14 @@ def _analyze_pdf(file_path: str) -> dict:
         "has_cover": False,
         "has_abstract": _has_section(sections, ["resumen", "abstract"]),
         "doc_type_hint": _detect_doc_type(sections, []),
+        "global_instructions": global_instructions,
     }
 
 
 def _extract_headings_from_text(text: str) -> list:
     lines = text.split('\n')
     sections = []
+    heading_indices = []
 
     heading_patterns = [
         (1, r'^(CAP[IÍ]TULO\s+[IVX\d]+.{0,60})$'),
@@ -235,13 +336,26 @@ def _extract_headings_from_text(text: str) -> list:
             continue
         for level, pattern in heading_patterns:
             if re.match(pattern, line, re.UNICODE):
-                preview = " ".join(lines[i+1:i+4]).strip()[:200]
-                sections.append({"level": level, "title": line, "content_preview": preview})
+                sections.append({"level": level, "title": line,
+                                  "content_preview": "", "full_content": "",
+                                  "instructions": {}})
+                heading_indices.append(i)
                 break
         else:
             if line.isupper() and 5 < len(line) < 120 and not _is_cover_section(line):
-                preview = " ".join(lines[i+1:i+4]).strip()[:200]
-                sections.append({"level": 2, "title": line, "content_preview": preview})
+                sections.append({"level": 2, "title": line,
+                                  "content_preview": "", "full_content": "",
+                                  "instructions": {}})
+                heading_indices.append(i)
+
+    # Asignar contenido a cada sección (texto entre este heading y el siguiente)
+    for j, (sec, hi) in enumerate(zip(sections, heading_indices)):
+        next_hi = heading_indices[j + 1] if j + 1 < len(heading_indices) else len(lines)
+        body_lines = [l.strip() for l in lines[hi+1:next_hi] if l.strip()]
+        full = " ".join(body_lines)[:4000]
+        sec["full_content"]    = full
+        sec["content_preview"] = full[:200]
+        sec["instructions"]    = _parse_instructions(full) if full else {}
 
     return sections
 
@@ -303,6 +417,7 @@ def _empty_structure() -> dict:
         "has_cover": False,
         "has_abstract": False,
         "doc_type_hint": "proyecto_tesis",
+        "global_instructions": {},
     }
 
 
