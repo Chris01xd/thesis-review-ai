@@ -178,7 +178,7 @@ export interface DocumentRequest {
 }
 
 export const generateThesis = (data: ThesisRequest) =>
-  client.post<ThesisResult>('/api/generar_tesis', data, { timeout: 120000 }).then((r) => r.data)
+  client.post<ThesisResult>('/api/generar_tesis', data, { timeout: 600000 }).then((r) => r.data)
 
 export const generateDocument = (data: DocumentRequest) => {
   const fd = new FormData()
@@ -192,7 +192,7 @@ export const generateDocument = (data: DocumentRequest) => {
   if (data.logo_data) fd.append('logo_data', data.logo_data)
   if (data.template_file) fd.append('template_file', data.template_file)
   return client.post<ThesisResult>('/api/generar_documento', fd, {
-    timeout: 180000,
+    timeout: 600000,
     headers: { 'Content-Type': 'multipart/form-data' },
   }).then((r) => r.data)
 }

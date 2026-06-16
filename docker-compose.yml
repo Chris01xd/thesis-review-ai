@@ -18,7 +18,7 @@ services:
     container_name: thesisreview_api
     ports:
       - "8000:8000"
-    command: uvicorn api_server:app --host 0.0.0.0 --port 8000
+    command: uvicorn api_server:app --host 0.0.0.0 --port 8000 --timeout-keep-alive 600
     volumes:
       - thesis_data:/app/data
     environment:
