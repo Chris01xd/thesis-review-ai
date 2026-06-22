@@ -127,6 +127,10 @@ export default function GenerarTesisPage() {
       .catch(() => {})
   }, [])
 
+  useEffect(() => {
+    setAuthorsOrcid(prev => prev.slice(0, parseAuthors(form.authors).length))
+  }, [form.authors])
+
   const set = (k: keyof FormState) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
     setForm(f => ({ ...f, [k]: k === 'year' ? Number(e.target.value) : e.target.value }))
 
@@ -159,7 +163,8 @@ export default function GenerarTesisPage() {
     if (templateInputRef.current) templateInputRef.current.value = ''
   }
 
-  const valid = form.title.trim() && form.authors.trim() && form.advisor.trim()
+  const orcidValid = authorsOrcid.every(o => !o?.trim() || ORCID_RE.test(o.trim()))
+  const valid = form.title.trim() && form.authors.trim() && form.advisor.trim() && orcidValid
   const activeType = DOC_TYPES.find(d => d.value === docType)!
 
   const handleGenerate = async () => {
