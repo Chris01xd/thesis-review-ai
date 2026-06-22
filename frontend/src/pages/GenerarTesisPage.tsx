@@ -174,9 +174,8 @@ export default function GenerarTesisPage() {
     setResult(null)
     setPdfUrl('')
     try {
-      const orcidStr = parsedAuthors
-        .map((_, i) => (authorsOrcid[i] || '').trim())
-        .join(',')
+      const orcidValues = parsedAuthors.map((_, i) => (authorsOrcid[i] || '').trim())
+      const hasOrcid   = orcidValues.some(Boolean)
       const res = await generateDocument({
         doc_type:      docType,
         title:         form.title.trim(),
@@ -186,7 +185,7 @@ export default function GenerarTesisPage() {
         city:          form.city,
         year:          form.year,
         logo_data:     logoData || undefined,
-        authors_orcid: orcidStr || undefined,
+        authors_orcid: hasOrcid ? orcidValues.join(',') : undefined,
         template_file: templateFile,
       })
       setResult(res)
@@ -198,7 +197,11 @@ export default function GenerarTesisPage() {
         setLoadingPdf(false)
       }
     } catch (e: unknown) {
-      const msg = e instanceof Error ? e.message : 'Error al generar el documento'
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const detail = (e as any)?.response?.data?.detail
+      const msg = detail
+        ? String(detail).slice(0, 400)
+        : e instanceof Error ? e.message : 'Error al generar el documento'
       setError(msg)
     } finally {
       setLoading(false)

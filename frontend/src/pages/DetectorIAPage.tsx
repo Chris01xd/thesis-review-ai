@@ -158,7 +158,11 @@ export default function DetectorIAPage() {
     if (!report) return
     setDownloading(true)
     try { await downloadAIDetectionReport(report) }
-    catch { setError('Error generando el reporte PDF.') }
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    catch (e: any) {
+      const detail = e?.response?.data?.detail ?? e?.message ?? 'Error generando el reporte PDF.'
+      setError(String(detail).slice(0, 400))
+    }
     finally { setDownloading(false) }
   }
 

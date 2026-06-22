@@ -1048,9 +1048,7 @@ async def generar_documento(
                     pass
 
     try:
-        orcid_list = []
-        if authors_orcid:
-            orcid_list = [o.strip() for o in authors_orcid.split(',')]
+        orcid_list = [o.strip() for o in authors_orcid.split(',')] if authors_orcid else []
         result = generate_document({
             'doc_type':          doc_type,
             'title':             title,
@@ -1065,7 +1063,10 @@ async def generar_documento(
         })
         return result
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error generando documento: {e}")
+        import traceback
+        tb = traceback.format_exc()
+        print(f"[generar_documento] ERROR:\n{tb}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Error generando documento: {e}\n\n{tb}")
 
 
 @app.get("/api/generar_documento/download/{filename}",
@@ -1154,7 +1155,10 @@ async def download_ai_detection_report(report_data: dict):
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Error generando reporte: {exc}")
+        import traceback
+        tb = traceback.format_exc()
+        print(f"[ai-detector/report] ERROR:\n{tb}", flush=True)
+        raise HTTPException(status_code=500, detail=f"Error generando reporte: {exc}\n\n{tb}")
 
 
 # ── Detector de contenido generado por IA ─────────────────────────────────────
