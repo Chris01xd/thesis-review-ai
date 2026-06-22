@@ -4386,6 +4386,7 @@ def _build_pdf_from_template(data: dict, template_structure: dict, all_sec: dict
     authors = data.get('authors', 'Autor')
     if isinstance(authors, str):
         authors = [a.strip() for a in authors.split(',')]
+    orcids = _split_orcids(data.get('authors_orcid', []))
 
     # ── Portada adaptativa ────────────────────────────────────────────────────
     # Para artículos: no hay portada, solo encabezado.
