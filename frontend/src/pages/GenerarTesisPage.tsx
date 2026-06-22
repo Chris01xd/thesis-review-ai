@@ -166,11 +166,6 @@ export default function GenerarTesisPage() {
     if (logoInputRef.current) logoInputRef.current.value = ''
   }
 
-  const removeTemplate = () => {
-    setTemplateFiles([])
-    if (templateInputRef.current) templateInputRef.current.value = ''
-  }
-
   const orcidValid = authorsOrcid.every(o => !o?.trim() || ORCID_RE.test(o.trim()))
   const valid = form.title.trim() && form.authors.trim() && form.advisor.trim() && orcidValid
   const activeType = DOC_TYPES.find(d => d.value === docType)!
