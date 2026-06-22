@@ -4292,6 +4292,7 @@ def _gen_section_with_instruction(
     full_content: str,
     instructions: dict,
     all_sec: dict,
+    global_directives: str = '',
 ) -> str:
     """
     Genera el contenido de una sección siguiendo las instrucciones de la plantilla.
@@ -4315,7 +4316,9 @@ def _gen_section_with_instruction(
         return static_content  # '' para tablas/diagramas gestionados externamente
 
     # Si el texto de la plantilla contiene instrucciones detalladas → usar OpenAI
-    if _is_instructional_text(full_content):
+    # También activar si hay directrices globales del archivo de directrices
+    has_directives = bool(global_directives and global_directives.strip())
+    if _is_instructional_text(full_content) or (has_directives and not static_content):
         api_key = os.getenv('OPENAI_API_KEY', '')
         if api_key:
             try:
@@ -4331,12 +4334,17 @@ def _gen_section_with_instruction(
                 }.get(instructions.get('tense', ''), '')
                 elems = instructions.get('required_elements', [])
                 elems_hint = ("Debe incluir: " + ", ".join(elems) + ".") if elems else ""
+                directives_block = (
+                    f"\nDIRECTRICES GENERALES DEL DOCUMENTO:\n{global_directives[:1500]}\n"
+                    if has_directives else ""
+                )
 
                 prompt = (
                     f"Eres un experto en redacción académica en español. "
                     f"Genera el contenido de la sección '{sec_title}' para un documento académico "
                     f"titulado: «{title}». Línea de investigación: {rl or 'ingeniería y tecnología'}.\n\n"
-                    f"INSTRUCCIONES DE LA PLANTILLA:\n{full_content[:2000]}\n\n"
+                    f"INSTRUCCIONES DE LA PLANTILLA:\n{full_content[:2000]}\n"
+                    f"{directives_block}"
                     f"{word_hint} {tense_hint} {elems_hint}\n\n"
                     f"Responde SOLO con el texto de la sección, sin encabezados ni metadatos. "
                     f"El contenido debe ser coherente, académico y específico para el tema."
@@ -4437,6 +4445,7 @@ def _build_pdf_from_template(data: dict, template_structure: dict, all_sec: dict
 
     # Recorrer secciones de la plantilla
     sections = template_structure.get('sections', [])
+    _tpl_directives = template_structure.get('global_instructions', {}).get('directives_text', '')
     if not sections:
         # Sin secciones detectadas: usar estructura base según tipo
         if doc_hint == 'articulo':
@@ -4462,7 +4471,7 @@ def _build_pdf_from_template(data: dict, template_structure: dict, all_sec: dict
             full_content = sec_item.get('full_content', '')
             instructions = sec_item.get('instructions', {})
             content = _gen_section_with_instruction(
-                title, rl, sec_title, full_content, instructions, all_sec
+                title, rl, sec_title, full_content, instructions, all_sec, _tpl_directives
             )
             if content:
                 if isinstance(content, list):
@@ -4605,6 +4614,7 @@ def _build_docx_from_template(data: dict, template_structure: dict, all_sec: dic
         doc.add_page_break()
 
     sections = template_structure.get('sections', [])
+    _tpl_directives_docx = template_structure.get('global_instructions', {}).get('directives_text', '')
     if not sections:
         if doc_hint == 'articulo':
             add_h("1    Introducción", 1); add_para(_rp(title, rl))
@@ -4627,7 +4637,7 @@ def _build_docx_from_template(data: dict, template_structure: dict, all_sec: dic
             full_content = sec_item.get('full_content', '')
             instructions = sec_item.get('instructions', {})
             content = _gen_section_with_instruction(
-                title, rl, sec_title, full_content, instructions, all_sec
+                title, rl, sec_title, full_content, instructions, all_sec, _tpl_directives_docx
             )
             if content:
                 if isinstance(content, list):

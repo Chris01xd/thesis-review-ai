@@ -449,8 +449,10 @@ def merge_template_structures(structures: list) -> dict:
     """
     Combina varias estructuras de plantilla en una sola.
     La primera plantilla actúa como estructura primaria (orden, tipo de doc, portada).
-    Las siguientes aportan secciones y tablas adicionales no presentes en la primera.
-    Los parámetros numéricos (min_refs, min_pages) toman el valor máximo entre todas.
+    Las siguientes (directrices) aportan:
+      - Instrucciones por sección para secciones coincidentes (merged into full_content + instructions)
+      - Secciones únicas adicionales
+      - Contexto global en global_instructions['directives_text']
     """
     valid = [s for s in structures if s and s.get('sections') is not None]
     if not valid:
@@ -459,24 +461,63 @@ def merge_template_structures(structures: list) -> dict:
         return valid[0]
 
     primary = valid[0]
-    seen = {s.get('title', '').lower().strip() for s in primary.get('sections', []) if s.get('title')}
+    # Index primary sections by normalized title for O(1) lookup
+    primary_by_title = {
+        s.get('title', '').lower().strip(): i
+        for i, s in enumerate(primary.get('sections', []))
+        if s.get('title')
+    }
+    seen = set(primary_by_title.keys())
 
-    merged_sections = list(primary.get('sections', []))
+    merged_sections = [dict(s) for s in primary.get('sections', [])]
     merged_tables   = list(primary.get('tables', []))
     g_inst = dict(primary.get('global_instructions', {}))
 
+    directive_texts: list = []
+
     for other in valid[1:]:
+        # Collect raw text from this directive file for global context
+        for sec in other.get('sections', []):
+            if sec.get('full_content'):
+                directive_texts.append(sec['full_content'])
+
         for sec in other.get('sections', []):
             t = sec.get('title', '').lower().strip()
-            if t and t not in seen:
-                merged_sections.append(sec)
+            if not t:
+                continue
+
+            if t in primary_by_title:
+                # Section exists in both files: merge instructions and append directive content
+                idx = primary_by_title[t]
+                merged_inst = dict(merged_sections[idx].get('instructions', {}))
+                for k, v in sec.get('instructions', {}).items():
+                    if k == 'required_elements' and isinstance(v, list):
+                        existing = merged_inst.get('required_elements', [])
+                        merged_inst['required_elements'] = list({*existing, *v})
+                    elif k not in merged_inst or not merged_inst[k]:
+                        merged_inst[k] = v
+                    elif isinstance(v, (int, float)) and isinstance(merged_inst[k], (int, float)):
+                        merged_inst[k] = max(merged_inst[k], v)
+                merged_sections[idx]['instructions'] = merged_inst
+
+                if sec.get('full_content'):
+                    existing_content = merged_sections[idx].get('full_content', '')
+                    merged_sections[idx]['full_content'] = (
+                        existing_content + '\n\n' + sec['full_content']
+                    ).strip()
+            else:
+                merged_sections.append(dict(sec))
                 seen.add(t)
+
         merged_tables.extend(other.get('tables', []))
         for k, v in other.get('global_instructions', {}).items():
             if k in g_inst and isinstance(v, (int, float)) and isinstance(g_inst[k], (int, float)):
                 g_inst[k] = max(g_inst[k], v)
             elif k not in g_inst:
                 g_inst[k] = v
+
+    if directive_texts:
+        g_inst['directives_text'] = '\n\n'.join(directive_texts)
 
     return {
         **primary,
