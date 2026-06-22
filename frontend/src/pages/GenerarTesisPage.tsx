@@ -80,7 +80,7 @@ const INITIAL: FormState = {
 }
 
 function parseAuthors(raw: string): string[] {
-  return raw.split(',').map(a => a.trim()).filter(Boolean)
+  return raw.split(/[,;\n]+/).map(a => a.trim()).filter(Boolean)
 }
 
 const ORCID_RE = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/
