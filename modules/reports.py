@@ -606,6 +606,19 @@ def generate_ai_detection_pdf(report: dict) -> bytes:
     def esc(t):
         return (t or "").replace('&','&amp;').replace('<','&lt;').replace('>','&gt;')
 
+    def text_chunks(text, max_chars=1200):
+        words, chunks, current = text.split(), [], ""
+        for word in words:
+            next_text = f"{current} {word}".strip()
+            if current and len(next_text) > max_chars:
+                chunks.append(current)
+                current = word
+            else:
+                current = next_text
+        if current:
+            chunks.append(current)
+        return chunks or [""]
+
     buf = io.BytesIO()
     doc = SimpleDocTemplate(
         buf, pagesize=A4,
@@ -811,21 +824,24 @@ def generate_ai_detection_pdf(report: dict) -> bytes:
             ]))
             story.append(badge_tbl)
 
-            # Texto con resaltado azul
-            hl_data = [[mk(
-                f'<font backColor="{hl}">{txt}</font>',
-                size=8, leading=13,
-            )]]
-            hl_tbl = Table(hl_data, colWidths=[W])
-            hl_tbl.setStyle(TableStyle([
-                ("BACKGROUND",    (0, 0), (-1, -1), colors.HexColor("#eff6ff")),
-                ("BOX",           (0, 0), (-1, -1), 0.8, colors.HexColor("#3b82f6")),
-                ("TOPPADDING",    (0, 0), (-1, -1), 7),
-                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
-                ("LEFTPADDING",   (0, 0), (-1, -1), 8),
-                ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
-            ]))
-            story += [hl_tbl, Spacer(1, 8)]
+            # Texto con resaltado azul. Se divide para evitar filas de tabla
+            # más altas que una página cuando el párrafo detectado es extenso.
+            for chunk in text_chunks(txt):
+                hl_data = [[mk(
+                    f'<font backColor="{hl}">{chunk}</font>',
+                    size=8, leading=13,
+                )]]
+                hl_tbl = Table(hl_data, colWidths=[W])
+                hl_tbl.setStyle(TableStyle([
+                    ("BACKGROUND",    (0, 0), (-1, -1), colors.HexColor("#eff6ff")),
+                    ("BOX",           (0, 0), (-1, -1), 0.8, colors.HexColor("#3b82f6")),
+                    ("TOPPADDING",    (0, 0), (-1, -1), 7),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+                    ("LEFTPADDING",   (0, 0), (-1, -1), 8),
+                    ("RIGHTPADDING",  (0, 0), (-1, -1), 8),
+                ]))
+                story.append(hl_tbl)
+            story.append(Spacer(1, 8))
 
         # Mini tabla de métricas de los párrafos
         story.append(mk("Distribución de scores por párrafo (todos los párrafos analizados)",
@@ -845,6 +861,8 @@ def generate_ai_detection_pdf(report: dict) -> bytes:
             ]]
             for j, p in enumerate(all_paras[:30], 1):
                 full_text = esc(p.get("text", "")).replace('\n', ' ')
+                if len(full_text) > 900:
+                    full_text = full_text[:900].rsplit(' ', 1)[0] + '...'
                 sc = p.get("score", 0)
                 score_color = ("#721c24" if sc >= 65 else
                                "#7d3c00" if sc >= 50 else
