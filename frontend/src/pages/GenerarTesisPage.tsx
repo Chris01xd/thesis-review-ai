@@ -15,7 +15,7 @@ const RESEARCH_LINES = [
   'Gestión de la Seguridad de la Información',
 ]
 
-const CITIES = ['Trujillo', 'Lima', 'Arequipa', 'Chiclayo', 'Piura', 'Cusco', 'Iquitos', 'Huancayo']
+const CITIES = ['Trujillo', 'Guadalupe', 'Lima', 'Arequipa', 'Chiclayo', 'Piura', 'Cusco', 'Iquitos', 'Huancayo']
 
 const DOC_TYPES: { value: DocType; label: string; desc: string; icon: typeof BookOpen; color: string; sections: string[] }[] = [
   {
