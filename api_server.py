@@ -15,7 +15,7 @@ try:
     from fastapi.middleware.cors import CORSMiddleware
     from fastapi.responses import FileResponse, Response
     from pydantic import BaseModel
-    from typing import Optional
+    from typing import Optional, List
     import httpx
     print("[startup] fastapi/pydantic OK", flush=True)
 except Exception as _e:
@@ -48,6 +48,7 @@ except Exception as _e:
 
 try:
     from modules.reports import generate_review_pdf, generate_similarity_pdf, generate_ai_detection_pdf
+    from modules.template_analyzer import merge_template_structures as _merge_tpl
     print("[startup] reports OK", flush=True)
 except Exception as _e:
     print("[startup] ERROR reports:", _e, flush=True); _tb.print_exc(); sys.exit(1)
@@ -1007,45 +1008,54 @@ def download_thesis_file(filename: str):
           summary="Generar documento académico (tesis, proyecto o artículo) con plantilla opcional",
           tags=["Tesis"])
 async def generar_documento(
-    doc_type:      str           = Form("tesis"),
-    title:         str           = Form(...),
-    authors:       str           = Form(...),
-    advisor:       str           = Form(...),
-    research_line: str           = Form("Gestión de Desarrollo de Software"),
-    city:          str           = Form("Trujillo"),
-    year:          int           = Form(2026),
-    logo_data:     Optional[str] = Form(None),
-    authors_orcid: Optional[str] = Form(None),
-    template_file: Optional[UploadFile] = File(None),
+    doc_type:       str                = Form("tesis"),
+    title:          str                = Form(...),
+    authors:        str                = Form(...),
+    advisor:        str                = Form(...),
+    research_line:  str                = Form("Gestión de Desarrollo de Software"),
+    city:           str                = Form("Trujillo"),
+    year:           int                = Form(2026),
+    logo_data:      Optional[str]      = Form(None),
+    authors_orcid:  Optional[str]      = Form(None),
+    template_files: List[UploadFile]   = File(default=[]),
 ):
     """
     Genera un documento académico completo en PDF y DOCX.
 
     - **doc_type**: "tesis" | "proyecto_tesis" | "articulo"
-    - **template_file**: plantilla DOCX o PDF opcional para respetar su estructura
+    - **template_files**: hasta 5 plantillas DOCX/PDF opcionales (se fusionan sus estructuras)
     - Todos los campos de texto son usados para personalizar el contenido.
     """
-    template_structure = None
+    from typing import List as _List
 
-    if template_file and template_file.filename:
-        ext = os.path.splitext(template_file.filename or "")[1].lower().lstrip(".")
-        if ext not in ("docx", "pdf"):
-            raise HTTPException(status_code=400, detail="La plantilla debe ser DOCX o PDF.")
+    template_structure = None
+    active_files = [f for f in (template_files or []) if f and f.filename]
+
+    if active_files:
         os.makedirs("data/uploads", exist_ok=True)
-        tmp_path = f"data/uploads/tpl_{int(time.time())}_{template_file.filename}"
-        try:
-            content = await template_file.read()
-            with open(tmp_path, "wb") as f_out:
-                f_out.write(content)
-            template_structure = analyze_template(tmp_path, ext)
-        except Exception as e:
-            print(f"[generar_documento] Error procesando plantilla: {e}")
-        finally:
-            if os.path.exists(tmp_path):
-                try:
-                    os.remove(tmp_path)
-                except Exception:
-                    pass
+        structures = []
+        tmp_paths  = []
+        for tpl in active_files[:5]:
+            ext = os.path.splitext(tpl.filename or "")[1].lower().lstrip(".")
+            if ext not in ("docx", "pdf"):
+                continue
+            tmp_path = f"data/uploads/tpl_{int(time.time())}_{tpl.filename}"
+            tmp_paths.append(tmp_path)
+            try:
+                content = await tpl.read()
+                with open(tmp_path, "wb") as f_out:
+                    f_out.write(content)
+                structures.append(analyze_template(tmp_path, ext))
+            except Exception as e:
+                print(f"[generar_documento] Error procesando plantilla {tpl.filename}: {e}")
+        for p in tmp_paths:
+            try:
+                if os.path.exists(p):
+                    os.remove(p)
+            except Exception:
+                pass
+        if structures:
+            template_structure = _merge_tpl(structures)
 
     try:
         orcid_list = [o.strip() for o in authors_orcid.split(',')] if authors_orcid else []

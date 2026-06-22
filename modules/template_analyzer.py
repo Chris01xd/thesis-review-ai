@@ -443,3 +443,44 @@ def analyze_template(file_path: str, file_type: str) -> dict:
     except Exception as e:
         print(f"[template_analyzer] Error analizando plantilla: {e}")
     return _empty_structure()
+
+
+def merge_template_structures(structures: list) -> dict:
+    """
+    Combina varias estructuras de plantilla en una sola.
+    La primera plantilla actúa como estructura primaria (orden, tipo de doc, portada).
+    Las siguientes aportan secciones y tablas adicionales no presentes en la primera.
+    Los parámetros numéricos (min_refs, min_pages) toman el valor máximo entre todas.
+    """
+    valid = [s for s in structures if s and s.get('sections') is not None]
+    if not valid:
+        return _empty_structure()
+    if len(valid) == 1:
+        return valid[0]
+
+    primary = valid[0]
+    seen = {s.get('title', '').lower().strip() for s in primary.get('sections', []) if s.get('title')}
+
+    merged_sections = list(primary.get('sections', []))
+    merged_tables   = list(primary.get('tables', []))
+    g_inst = dict(primary.get('global_instructions', {}))
+
+    for other in valid[1:]:
+        for sec in other.get('sections', []):
+            t = sec.get('title', '').lower().strip()
+            if t and t not in seen:
+                merged_sections.append(sec)
+                seen.add(t)
+        merged_tables.extend(other.get('tables', []))
+        for k, v in other.get('global_instructions', {}).items():
+            if k in g_inst and isinstance(v, (int, float)) and isinstance(g_inst[k], (int, float)):
+                g_inst[k] = max(g_inst[k], v)
+            elif k not in g_inst:
+                g_inst[k] = v
+
+    return {
+        **primary,
+        'sections':            merged_sections,
+        'tables':              merged_tables,
+        'global_instructions': g_inst,
+    }

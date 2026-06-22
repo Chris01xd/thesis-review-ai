@@ -175,7 +175,7 @@ export interface DocumentRequest {
   year: number
   logo_data?: string
   authors_orcid?: string
-  template_file?: File | null
+  template_files?: File[]
 }
 
 export const generateThesis = (data: ThesisRequest) =>
@@ -192,7 +192,9 @@ export const generateDocument = (data: DocumentRequest) => {
   fd.append('year', String(data.year))
   if (data.logo_data) fd.append('logo_data', data.logo_data)
   if (data.authors_orcid) fd.append('authors_orcid', data.authors_orcid)
-  if (data.template_file) fd.append('template_file', data.template_file)
+  if (data.template_files?.length) {
+    data.template_files.forEach(f => fd.append('template_files', f))
+  }
   return client.post<ThesisResult>('/api/generar_documento', fd, {
     timeout: 600000,
     headers: { 'Content-Type': 'multipart/form-data' },

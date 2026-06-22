@@ -107,7 +107,7 @@ export default function GenerarTesisPage() {
   const [loadingPdf, setLoadingPdf] = useState(false)
   const [logoData, setLogoData]     = useState<string>('')
   const [logoPreview, setLogoPreview] = useState<string>('')
-  const [templateFile, setTemplateFile] = useState<File | null>(null)
+  const [templateFiles, setTemplateFiles] = useState<File[]>([])
   const [advisors, setAdvisors]     = useState<{ id: number; name: string }[]>([])
   const logoInputRef     = useRef<HTMLInputElement>(null)
   const templateInputRef = useRef<HTMLInputElement>(null)
@@ -147,10 +147,18 @@ export default function GenerarTesisPage() {
   }
 
   const handleTemplateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    setTemplateFile(file)
+    const files = Array.from(e.target.files ?? [])
+    if (!files.length) return
+    setTemplateFiles(prev => {
+      const existing = new Set(prev.map(f => f.name))
+      const added = files.filter(f => !existing.has(f.name))
+      return [...prev, ...added].slice(0, 5)
+    })
+    if (templateInputRef.current) templateInputRef.current.value = ''
   }
+
+  const removeTemplateFile = (idx: number) =>
+    setTemplateFiles(prev => prev.filter((_, i) => i !== idx))
 
   const removeLogo = () => {
     setLogoData('')
@@ -159,7 +167,7 @@ export default function GenerarTesisPage() {
   }
 
   const removeTemplate = () => {
-    setTemplateFile(null)
+    setTemplateFiles([])
     if (templateInputRef.current) templateInputRef.current.value = ''
   }
 
@@ -185,8 +193,8 @@ export default function GenerarTesisPage() {
         city:          form.city,
         year:          form.year,
         logo_data:     logoData || undefined,
-        authors_orcid: hasOrcid ? orcidValues.join(',') : undefined,
-        template_file: templateFile,
+        authors_orcid:  hasOrcid ? orcidValues.join(',') : undefined,
+        template_files: templateFiles.length ? templateFiles : undefined,
       })
       setResult(res)
       setLoadingPdf(true)
@@ -396,47 +404,61 @@ export default function GenerarTesisPage() {
             </div>
           </div>
 
-          {/* Plantilla (nuevo) */}
+          {/* Plantillas de referencia (múltiples) */}
           <div className="space-y-1.5">
             <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
-              <FileUp size={14} /> Plantilla de referencia
-              <span className="font-normal text-gray-400">(opcional, DOCX o PDF)</span>
+              <FileUp size={14} /> Plantillas de referencia
+              <span className="font-normal text-gray-400">(opcional, hasta 5 DOCX/PDF)</span>
             </label>
-            {templateFile ? (
-              <div className="flex items-center gap-3 p-3 border border-emerald-200 rounded-lg bg-emerald-50">
-                <FileText size={20} className="text-emerald-600 shrink-0" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-medium text-emerald-800 truncate">{templateFile.name}</p>
-                  <p className="text-xs text-emerald-600">
-                    Se analizará la estructura y se usará como modelo
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={removeTemplate}
-                  className="p-1 text-gray-400 hover:text-red-500 transition-colors shrink-0"
-                  title="Quitar plantilla"
-                >
-                  <X size={16} />
-                </button>
+
+            {/* Lista de archivos subidos */}
+            {templateFiles.length > 0 && (
+              <div className="space-y-1.5">
+                {templateFiles.map((f, idx) => (
+                  <div key={idx} className="flex items-center gap-2 p-2.5 border border-emerald-200 rounded-lg bg-emerald-50">
+                    <FileText size={16} className="text-emerald-600 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-medium text-emerald-800 truncate">{f.name}</p>
+                      <p className="text-xs text-emerald-600">
+                        {idx === 0 ? 'Estructura principal' : `Referencia ${idx + 1}`}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeTemplateFile(idx)}
+                      className="p-1 text-gray-400 hover:text-red-500 transition-colors shrink-0"
+                      title="Quitar"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <label className="flex flex-col items-center justify-center gap-1.5 w-full h-20 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-emerald-400 hover:bg-emerald-50 transition-colors">
-                <FileUp size={20} className="text-gray-400" />
-                <span className="text-xs text-gray-500">Haz clic para subir plantilla DOCX o PDF</span>
+            )}
+
+            {/* Botón para añadir más (oculto si ya hay 5) */}
+            {templateFiles.length < 5 && (
+              <label className="flex items-center justify-center gap-2 w-full h-16 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-emerald-400 hover:bg-emerald-50 transition-colors">
+                <FileUp size={18} className="text-gray-400" />
+                <span className="text-xs text-gray-500">
+                  {templateFiles.length === 0
+                    ? 'Haz clic para subir plantilla DOCX o PDF'
+                    : `Añadir otra plantilla (${templateFiles.length}/5)`}
+                </span>
                 <input
                   ref={templateInputRef}
                   type="file"
+                  multiple
                   accept=".docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   className="hidden"
                   onChange={handleTemplateChange}
                 />
               </label>
             )}
-            {templateFile && (
+
+            {templateFiles.length > 0 && (
               <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
-                El sistema detectará sus secciones, tablas, matrices, cronogramas y presupuestos,
-                y generará el nuevo documento siguiendo esa misma estructura con contenido adaptado al título.
+                La primera plantilla define la estructura principal. Las siguientes aportan secciones y tablas adicionales. Todas se fusionan para generar el documento.
               </p>
             )}
           </div>
@@ -512,9 +534,9 @@ export default function GenerarTesisPage() {
             {docType !== 'articulo' && (
               <p className="mt-1 font-medium">Arial Narrow 12 pt · Interlineado 1.5 · Márgenes 3/2.5 cm</p>
             )}
-            {templateFile && (
+            {templateFiles.length > 0 && (
               <p className="mt-1 font-medium text-orange-700 bg-orange-100 rounded px-2 py-1">
-                Con plantilla: estructura y tablas adaptadas al nuevo título
+                Con {templateFiles.length} plantilla{templateFiles.length > 1 ? 's' : ''}: estructura y tablas fusionadas
               </p>
             )}
           </div>
@@ -542,9 +564,9 @@ export default function GenerarTesisPage() {
                       <span className="text-green-500 font-bold">✓</span> {s}
                     </div>
                   ))}
-                  {templateFile && (
+                  {templateFiles.length > 0 && (
                     <div className="col-span-2 flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 rounded px-2 py-1">
-                      <span className="font-bold">✓</span> Estructura basada en plantilla subida
+                      <span className="font-bold">✓</span> Estructura fusionada de {templateFiles.length} plantilla{templateFiles.length > 1 ? 's' : ''}
                     </div>
                   )}
                 </div>
