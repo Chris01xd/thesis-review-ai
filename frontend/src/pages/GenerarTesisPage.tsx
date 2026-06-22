@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import {
   FileText, Download, Loader2, Sparkles, BookOpen,
   User, Users, MapPin, Calendar, ImagePlus, X,
-  FileUp, GraduationCap, Newspaper, ClipboardList,
+  FileUp, GraduationCap, Newspaper, ClipboardList, Link,
 } from 'lucide-react'
 import { generateDocument, downloadThesisFile, getThesisPdfBlob, getUsers } from '../api'
 import type { ThesisResult, DocType } from '../api'
@@ -79,6 +79,12 @@ const INITIAL: FormState = {
   year: new Date().getFullYear(),
 }
 
+function parseAuthors(raw: string): string[] {
+  return raw.split(',').map(a => a.trim()).filter(Boolean)
+}
+
+const ORCID_RE = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/
+
 const colorMap: Record<string, string> = {
   blue:    'border-blue-500 bg-blue-50 text-blue-700',
   emerald: 'border-emerald-500 bg-emerald-50 text-emerald-700',
@@ -91,19 +97,29 @@ const btnColorMap: Record<string, string> = {
 }
 
 export default function GenerarTesisPage() {
-  const [docType, setDocType]     = useState<DocType>('tesis')
-  const [form, setForm]           = useState<FormState>(INITIAL)
-  const [loading, setLoading]     = useState(false)
-  const [result, setResult]       = useState<ThesisResult | null>(null)
-  const [error, setError]         = useState('')
-  const [pdfUrl, setPdfUrl]       = useState('')
+  const [docType, setDocType]       = useState<DocType>('tesis')
+  const [form, setForm]             = useState<FormState>(INITIAL)
+  const [authorsOrcid, setAuthorsOrcid] = useState<string[]>([])
+  const [loading, setLoading]       = useState(false)
+  const [result, setResult]         = useState<ThesisResult | null>(null)
+  const [error, setError]           = useState('')
+  const [pdfUrl, setPdfUrl]         = useState('')
   const [loadingPdf, setLoadingPdf] = useState(false)
-  const [logoData, setLogoData]   = useState<string>('')
+  const [logoData, setLogoData]     = useState<string>('')
   const [logoPreview, setLogoPreview] = useState<string>('')
   const [templateFile, setTemplateFile] = useState<File | null>(null)
-  const [advisors, setAdvisors]   = useState<{ id: number; name: string }[]>([])
-  const logoInputRef = useRef<HTMLInputElement>(null)
+  const [advisors, setAdvisors]     = useState<{ id: number; name: string }[]>([])
+  const logoInputRef     = useRef<HTMLInputElement>(null)
   const templateInputRef = useRef<HTMLInputElement>(null)
+
+  const parsedAuthors = parseAuthors(form.authors)
+
+  const setOrcid = (idx: number, val: string) =>
+    setAuthorsOrcid(prev => {
+      const next = [...prev]
+      next[idx] = val
+      return next
+    })
 
   useEffect(() => {
     getUsers('ADVISOR')
@@ -153,6 +169,9 @@ export default function GenerarTesisPage() {
     setResult(null)
     setPdfUrl('')
     try {
+      const orcidStr = parsedAuthors
+        .map((_, i) => (authorsOrcid[i] || '').trim())
+        .join(',')
       const res = await generateDocument({
         doc_type:      docType,
         title:         form.title.trim(),
@@ -162,6 +181,7 @@ export default function GenerarTesisPage() {
         city:          form.city,
         year:          form.year,
         logo_data:     logoData || undefined,
+        authors_orcid: orcidStr || undefined,
         template_file: templateFile,
       })
       setResult(res)
@@ -266,6 +286,40 @@ export default function GenerarTesisPage() {
               className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+
+          {/* ORCID por autor */}
+          {parsedAuthors.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+                <Link size={14} /> ORCID de autor(es)
+                <span className="font-normal text-gray-400">(opcional)</span>
+              </label>
+              {parsedAuthors.map((name, idx) => {
+                const val = authorsOrcid[idx] || ''
+                const invalid = val && !ORCID_RE.test(val)
+                return (
+                  <div key={idx} className="space-y-1">
+                    <span className="text-xs text-gray-500 font-medium">{name}</span>
+                    <input
+                      type="text"
+                      value={val}
+                      onChange={e => setOrcid(idx, e.target.value)}
+                      placeholder="0000-0000-0000-0000"
+                      maxLength={19}
+                      className={`w-full border rounded-lg px-3 py-1.5 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                        invalid
+                          ? 'border-red-400 bg-red-50 focus:ring-red-400'
+                          : 'border-gray-300'
+                      }`}
+                    />
+                    {invalid && (
+                      <p className="text-xs text-red-500">Formato: 0000-0000-0000-0000</p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
 
           {/* Asesor */}
           <div className="space-y-1.5">

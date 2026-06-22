@@ -174,6 +174,7 @@ export interface DocumentRequest {
   city: string
   year: number
   logo_data?: string
+  authors_orcid?: string
   template_file?: File | null
 }
 
@@ -190,6 +191,7 @@ export const generateDocument = (data: DocumentRequest) => {
   fd.append('city', data.city)
   fd.append('year', String(data.year))
   if (data.logo_data) fd.append('logo_data', data.logo_data)
+  if (data.authors_orcid) fd.append('authors_orcid', data.authors_orcid)
   if (data.template_file) fd.append('template_file', data.template_file)
   return client.post<ThesisResult>('/api/generar_documento', fd, {
     timeout: 600000,

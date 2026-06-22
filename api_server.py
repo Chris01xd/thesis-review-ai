@@ -1013,6 +1013,7 @@ async def generar_documento(
     city:          str           = Form("Trujillo"),
     year:          int           = Form(2026),
     logo_data:     Optional[str] = Form(None),
+    authors_orcid: Optional[str] = Form(None),
     template_file: Optional[UploadFile] = File(None),
 ):
     """
@@ -1045,6 +1046,9 @@ async def generar_documento(
                     pass
 
     try:
+        orcid_list = []
+        if authors_orcid:
+            orcid_list = [o.strip() for o in authors_orcid.split(',')]
         result = generate_document({
             'doc_type':          doc_type,
             'title':             title,
@@ -1054,6 +1058,7 @@ async def generar_documento(
             'city':              city,
             'year':              year,
             'logo_data':         logo_data,
+            'authors_orcid':     orcid_list,
             'template_structure': template_structure,
         })
         return result
