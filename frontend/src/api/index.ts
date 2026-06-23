@@ -176,6 +176,7 @@ export interface DocumentRequest {
   logo_data?: string
   authors_orcid?: string
   template_files?: File[]
+  table_instructions?: string
 }
 
 export const generateThesis = (data: ThesisRequest) =>
@@ -195,6 +196,7 @@ export const generateDocument = (data: DocumentRequest) => {
   if (data.template_files?.length) {
     data.template_files.forEach(f => fd.append('template_files', f))
   }
+  if (data.table_instructions?.trim()) fd.append('table_instructions', data.table_instructions.trim())
   return client.post<ThesisResult>('/api/generar_documento', fd, {
     timeout: 600000,
     headers: { 'Content-Type': 'multipart/form-data' },

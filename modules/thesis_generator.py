@@ -1848,7 +1848,7 @@ def _make_table(headers: list, rows: list, col_widths=None) -> Table:
 
 
 # ── Construcción del PDF ──────────────────────────────────────────────────────
-def _build_pdf(data: dict, sec: dict, refs: list, uid: str, logo_path: str = None) -> str:
+def _build_pdf(data: dict, sec: dict, refs: list, uid: str, logo_path: str = None, extra_elements: dict = None) -> str:
     _register_fonts()
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     path = f"{OUTPUT_DIR}/tesis_{uid}.pdf"
@@ -2106,6 +2106,7 @@ def _build_pdf(data: dict, sec: dict, refs: list, uid: str, logo_path: str = Non
     ))
     sp(6)
     p("Nota: VI = Variable Independiente; VD = Variable Dependiente; OE = Objetivo Específico.", 'sm')
+    _inject_pdf(story, extra_elements, ['cap1', 'introduccion', 'antecedentes', 'marco_teorico'], A4[0]-ML-MR, s)
     br()
 
     # ── 9. CAPÍTULO II: METODOLOGÍA ──────────────────────────────────────────
@@ -2201,6 +2202,7 @@ def _build_pdf(data: dict, sec: dict, refs: list, uid: str, logo_path: str = Non
     sp(6)
     p("Nota: S = semanas del cronograma de ejecución. X indica el período de ejecución de cada actividad.", 'sm')
     sp(10)
+    _inject_pdf(story, extra_elements, ['cap2', 'metodologia', 'metodos'], A4[0]-ML-MR, s)
     br()
 
     # ── 10. CAPÍTULO III: RESULTADOS ─────────────────────────────────────────
@@ -2358,6 +2360,7 @@ def _build_pdf(data: dict, sec: dict, refs: list, uid: str, logo_path: str = Non
     sp(6)
     p("Nota: IC = Intervalo de Confianza. El límite inferior del IC excluye el 30% en todos los indicadores,", 'sm')
     p("confirmando robustamente la hipótesis de investigación al 95% de confianza.", 'sm')
+    _inject_pdf(story, extra_elements, ['cap3', 'resultados'], A4[0]-ML-MR, s)
     br()
 
     # ── 11. CAPÍTULO IV: DISCUSIÓN ────────────────────────────────────────────
@@ -2367,6 +2370,7 @@ def _build_pdf(data: dict, sec: dict, refs: list, uid: str, logo_path: str = Non
         if para.strip():
             p(para.strip())
             sp(4)
+    _inject_pdf(story, extra_elements, ['cap4', 'discusion'], A4[0]-ML-MR, s)
     br()
 
     # ── 12. CAPÍTULO V: CONCLUSIONES Y RECOMENDACIONES ───────────────────────
@@ -2386,6 +2390,7 @@ def _build_pdf(data: dict, sec: dict, refs: list, uid: str, logo_path: str = Non
         if para.strip():
             p(para.strip())
             sp(4)
+    _inject_pdf(story, extra_elements, ['cap5', 'conclusiones', 'extra'], A4[0]-ML-MR, s)
     br()
 
     # ── 13. REFERENCIAS ───────────────────────────────────────────────────────
@@ -2467,7 +2472,7 @@ def _set_para_fmt(para, font_name='Arial Narrow', size=12,
     pPr.append(pSpacing)
 
 
-def _build_docx(data: dict, sec: dict, refs: list, uid: str, logo_path: str = None) -> str:
+def _build_docx(data: dict, sec: dict, refs: list, uid: str, logo_path: str = None, extra_elements: dict = None) -> str:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     path = f"{OUTPUT_DIR}/tesis_{uid}.docx"
     doc = _DocxDoc()
@@ -2576,6 +2581,7 @@ def _build_docx(data: dict, sec: dict, refs: list, uid: str, logo_path: str = No
     for para_text in sec['lim'].split('\n\n'):
         if para_text.strip():
             add_para(para_text.strip())
+    _inject_docx(doc, extra_elements, ['cap1', 'introduccion', 'antecedentes', 'marco_teorico'])
     add_page_break()
 
     # Capítulo II
@@ -2594,6 +2600,7 @@ def _build_docx(data: dict, sec: dict, refs: list, uid: str, logo_path: str = No
         for para_text in c2.get(key, '').split('\n\n'):
             if para_text.strip():
                 add_para(re.sub(r'<[^>]+>', '', para_text.strip()))
+    _inject_docx(doc, extra_elements, ['cap2', 'metodologia', 'metodos'])
     add_page_break()
 
     # Capítulo III
@@ -2610,6 +2617,7 @@ def _build_docx(data: dict, sec: dict, refs: list, uid: str, logo_path: str = No
         for para_text in c3.get(key, '').split('\n\n'):
             if para_text.strip():
                 add_para(re.sub(r'<[^>]+>', '', para_text.strip()))
+    _inject_docx(doc, extra_elements, ['cap3', 'resultados'])
     add_page_break()
 
     # Capítulo IV
@@ -2617,6 +2625,7 @@ def _build_docx(data: dict, sec: dict, refs: list, uid: str, logo_path: str = No
     for para_text in sec.get('cap4', '').split('\n\n'):
         if para_text.strip():
             add_para(re.sub(r'<[^>]+>', '', para_text.strip()))
+    _inject_docx(doc, extra_elements, ['cap4', 'discusion'])
     add_page_break()
 
     # Capítulo V
@@ -2630,6 +2639,7 @@ def _build_docx(data: dict, sec: dict, refs: list, uid: str, logo_path: str = No
     for para_text in c5.get('recomendaciones', '').split('\n\n'):
         if para_text.strip():
             add_para(re.sub(r'<[^>]+>', '', para_text.strip()))
+    _inject_docx(doc, extra_elements, ['cap5', 'conclusiones', 'extra'])
     add_page_break()
 
     # Referencias
@@ -3586,7 +3596,7 @@ def _map_section_to_content(section_title: str, title: str, rl: str,
 
 # ── PDF: Proyecto de Tesis ─────────────────────────────────────────────────────
 
-def _build_pdf_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path: str = None) -> str:
+def _build_pdf_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path: str = None, extra_elements: dict = None) -> str:
     _register_fonts()
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     path = f"{OUTPUT_DIR}/doc_{uid}.pdf"
@@ -3712,6 +3722,7 @@ def _build_pdf_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path: 
             p(str(l), 'n')
     else:
         p(str(lim_val), 'n')
+    _inject_pdf(story, extra_elements, ['cap1', 'introduccion', 'antecedentes', 'marco_teorico'], A4[0]-ML-MR, s)
     br()
 
     # ── CAPÍTULO II: MÉTODO
@@ -3722,6 +3733,7 @@ def _build_pdf_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path: 
     p("2.1 Variables y Operacionalización", 'h2')
     sp(6)
     _pdf_operacionalizacion_table(story, data['title'])
+    _inject_pdf(story, extra_elements, ['cap2', 'metodologia', 'metodos'], A4[0]-ML-MR, s)
     br()
 
     # ── CAPÍTULO III: ASPECTOS ADMINISTRATIVOS
@@ -3744,6 +3756,7 @@ def _build_pdf_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path: 
         pres_rows,
         [7*cm, 3.5*cm, 3.5*cm, 3*cm],
     )
+    _inject_pdf(story, extra_elements, ['cap3', 'resultados', 'extra', 'conclusiones'], A4[0]-ML-MR, s)
     br()
 
     # ── REFERENCIAS
@@ -3797,7 +3810,7 @@ def _build_pdf_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path: 
 
 # ── DOCX: Proyecto de Tesis ────────────────────────────────────────────────────
 
-def _build_docx_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path: str = None) -> str:
+def _build_docx_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path: str = None, extra_elements: dict = None) -> str:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     path = f"{OUTPUT_DIR}/doc_{uid}.docx"
 
@@ -3931,6 +3944,7 @@ def _build_docx_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path:
     add_h("3.2 Presupuesto", 2)
     pres_rows = sec.get('presupuesto_rows', _tabla_presupuesto(data['title']))
     add_table_docx(["Descripción", "Cantidad/Tiempo", "Precio unitario", "Total"], pres_rows)
+    _inject_docx(doc, extra_elements, ['cap1', 'cap2', 'cap3', 'resultados', 'metodologia', 'introduccion', 'antecedentes', 'marco_teorico', 'extra'])
     doc.add_page_break()
 
     # Referencias
@@ -3969,7 +3983,7 @@ def _build_docx_proyecto(data: dict, sec: dict, refs: list, uid: str, logo_path:
 
 # ── PDF: Artículo de Investigación ────────────────────────────────────────────
 
-def _build_pdf_articulo(data: dict, sec: dict, refs: list, uid: str, logo_path: str = None) -> str:
+def _build_pdf_articulo(data: dict, sec: dict, refs: list, uid: str, logo_path: str = None, extra_elements: dict = None) -> str:
     _register_fonts()
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     path = f"{OUTPUT_DIR}/doc_{uid}.pdf"
@@ -4032,6 +4046,11 @@ def _build_pdf_articulo(data: dict, sec: dict, refs: list, uid: str, logo_path: 
     br()
 
     # ── Secciones numeradas (RCSI: arábigos) ──────────────────────────────────
+    _articulo_elem_keys = {
+        'introduction':       ['intro', 'introduccion'],
+        'methodology':        ['cap2', 'metodologia', 'metodos', 'materiales'],
+        'resultados_discusion':['cap3', 'resultados', 'cap4', 'discusion'],
+    }
     for heading, key in [
         ("1    Introducción",          'introduction'),
         ("2    Materiales y métodos",  'methodology'),
@@ -4041,12 +4060,14 @@ def _build_pdf_articulo(data: dict, sec: dict, refs: list, uid: str, logo_path: 
         sp(6)
         p(str(sec.get(key, '')), 'n')
         sp(12)
+        _inject_pdf(story, extra_elements, _articulo_elem_keys.get(key, []), A4[0]-ML-MR, s)
 
     # ── Conclusiones (sin número) ─────────────────────────────────────────────
     p("Conclusiones", 'h1')
     sp(6)
     p(str(sec.get('conclusions', '')), 'n')
     sp(12)
+    _inject_pdf(story, extra_elements, ['cap5', 'conclusiones', 'extra'], A4[0]-ML-MR, s)
 
     # ── Agradecimientos ───────────────────────────────────────────────────────
     p("Agradecimientos", 'h2')
@@ -4098,7 +4119,7 @@ def _build_pdf_articulo(data: dict, sec: dict, refs: list, uid: str, logo_path: 
 
 # ── DOCX: Artículo de Investigación ───────────────────────────────────────────
 
-def _build_docx_articulo(data: dict, sec: dict, refs: list, uid: str, logo_path: str = None) -> str:
+def _build_docx_articulo(data: dict, sec: dict, refs: list, uid: str, logo_path: str = None, extra_elements: dict = None) -> str:
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     path = f"{OUTPUT_DIR}/doc_{uid}.docx"
 
@@ -4187,6 +4208,11 @@ def _build_docx_articulo(data: dict, sec: dict, refs: list, uid: str, logo_path:
     doc.add_page_break()
 
     # ── Secciones numeradas (RCSI) ────────────────────────────────────────────
+    _art_docx_keys = {
+        'introduction':        ['intro', 'introduccion'],
+        'methodology':         ['cap2', 'metodologia', 'metodos', 'materiales'],
+        'resultados_discusion': ['cap3', 'resultados', 'cap4', 'discusion'],
+    }
     for heading, key in [
         ("1    Introducción",          'introduction'),
         ("2    Materiales y métodos",  'methodology'),
@@ -4194,10 +4220,12 @@ def _build_docx_articulo(data: dict, sec: dict, refs: list, uid: str, logo_path:
     ]:
         add_h(heading, 1)
         add_para(str(sec.get(key, '')))
+        _inject_docx(doc, extra_elements, _art_docx_keys.get(key, []))
 
     # ── Conclusiones ──────────────────────────────────────────────────────────
     add_h("Conclusiones", 2)
     add_para(str(sec.get('conclusions', '')))
+    _inject_docx(doc, extra_elements, ['cap5', 'conclusiones', 'extra'])
 
     # ── Secciones finales RCSI ────────────────────────────────────────────────
     add_h("Agradecimientos", 2)
@@ -4366,7 +4394,7 @@ def _gen_section_with_instruction(
 
 
 def _build_pdf_from_template(data: dict, template_structure: dict, all_sec: dict,
-                              refs: list, uid: str, logo_path: str = None) -> str:
+                              refs: list, uid: str, logo_path: str = None, extra_elements: dict = None) -> str:
     """Construye un PDF siguiendo la estructura de una plantilla analizada."""
     _register_fonts()
     os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -4528,6 +4556,10 @@ def _build_pdf_from_template(data: dict, template_structure: dict, all_sec: dict
             if level == 1:
                 br()
 
+    # Elementos del usuario antes de referencias
+    if extra_elements:
+        _inject_pdf(story, extra_elements, list(extra_elements.keys()), A4[0]-ML-MR, s)
+
     # Referencias siempre al final
     g_inst = template_structure.get('global_instructions', {})
     n_ref_tpl = g_inst.get('min_refs') or 25
@@ -4543,7 +4575,7 @@ def _build_pdf_from_template(data: dict, template_structure: dict, all_sec: dict
 
 
 def _build_docx_from_template(data: dict, template_structure: dict, all_sec: dict,
-                               refs: list, uid: str, logo_path: str = None) -> str:
+                               refs: list, uid: str, logo_path: str = None, extra_elements: dict = None) -> str:
     """Construye un DOCX siguiendo la estructura de una plantilla analizada."""
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     path = f"{OUTPUT_DIR}/doc_{uid}.docx"
@@ -4674,6 +4706,10 @@ def _build_docx_from_template(data: dict, template_structure: dict, all_sec: dic
             if level == 1:
                 doc.add_page_break()
 
+    # Elementos del usuario antes de referencias
+    if extra_elements:
+        _inject_docx(doc, extra_elements, list(extra_elements.keys()))
+
     # Referencias
     g_inst = template_structure.get('global_instructions', {})
     n_ref_tpl = g_inst.get('min_refs') or 25
@@ -4683,6 +4719,275 @@ def _build_docx_from_template(data: dict, template_structure: dict, all_sec: dic
 
     doc.save(path)
     return path
+
+
+# ── Generación de elementos por indicaciones del usuario ──────────────────────
+
+_SECTION_KEY_VARIANTS: dict = {
+    'cap1': ['cap1','cap i','introduccion','introducción','antecedentes','marco teorico',
+             'marco teórico','marco conceptual','planteamiento','realidad problematica'],
+    'cap2': ['cap2','cap ii','metodologia','metodología','método','metodo','materiales',
+             'marco metodologico','marco metodológico'],
+    'cap3': ['cap3','cap iii','resultado','resultados'],
+    'cap4': ['cap4','cap iv','discusion','discusión'],
+    'cap5': ['cap5','cap v','conclusion','conclusiones','conclusión'],
+    'intro': ['introduccion','introducción','intro'],
+    'metodos': ['metodos','métodos','materiales y metodos','materiales y métodos'],
+    'resultados': ['resultado','resultados'],
+    'discusion': ['discusion','discusión'],
+    'conclusiones': ['conclusion','conclusiones','conclusión'],
+}
+
+def _normalize_section_key(raw: str) -> str:
+    r = (raw or '').lower().strip()
+    for c, a in zip('áéíóú', 'aeiou'):
+        r = r.replace(c, a)
+    for key, variants in _SECTION_KEY_VARIANTS.items():
+        if any(v in r for v in variants):
+            return key
+    return 'extra'
+
+
+def _parse_elements_instructions(text: str, title: str, rl: str) -> list:
+    """Call OpenAI to parse user element instructions into structured data."""
+    api_key = os.getenv('OPENAI_API_KEY', '')
+    if not api_key or not text.strip():
+        return []
+    try:
+        import openai
+        client = openai.OpenAI(api_key=api_key)
+        prompt = (
+            f"Eres un asistente de redacción académica en español. "
+            f"El usuario está generando un documento académico titulado «{title}» "
+            f"(línea de investigación: {rl or 'ingeniería y tecnología'}).\n\n"
+            f"INSTRUCCIONES DEL USUARIO:\n{text}\n\n"
+            f"Genera un JSON con la clave \"elements\" que sea una lista de elementos "
+            f"(tablas, gráficos, imágenes). Genera EXACTAMENTE la cantidad solicitada.\n\n"
+            f"Cada elemento debe tener:\n"
+            f"- type: \"table\" | \"chart\" | \"image\"\n"
+            f"- number: número correlativo (1, 2, 3...)\n"
+            f"- title: título descriptivo académico\n"
+            f"- section: \"cap1\" (introducción/antecedentes/marco teórico) | \"cap2\" (metodología) | "
+            f"\"cap3\" (resultados) | \"cap4\" (discusión) | \"cap5\" (conclusiones) | \"extra\"\n"
+            f"Para type=\"table\": también columns (lista de encabezados), rows (lista de listas con datos reales), "
+            f"source (fuente, ej: 'Elaboración propia'), interpretation (1-2 oraciones)\n"
+            f"Para type=\"chart\": también chart_type (\"bar\"|\"pie\"|\"line\"), labels (lista de etiquetas), "
+            f"data (lista de números plausibles), x_label, y_label, source, interpretation\n"
+            f"Para type=\"image\": también description (descripción detallada del diagrama/imagen), source\n\n"
+            f"Usa datos coherentes con el título del documento. No inventes estadísticas exactas."
+        )
+        resp = client.chat.completions.create(
+            model=os.getenv('OPENAI_MODEL', 'gpt-4o-mini'),
+            messages=[{'role': 'user', 'content': prompt}],
+            temperature=0.5, max_tokens=3500,
+            response_format={'type': 'json_object'},
+        )
+        parsed = json.loads(resp.choices[0].message.content)
+        elements = parsed.get('elements') or parsed.get('tablas') or []
+        if not isinstance(elements, list):
+            for v in parsed.values():
+                if isinstance(v, list):
+                    elements = v
+                    break
+        return elements if isinstance(elements, list) else []
+    except Exception as e:
+        print(f"[parse_elements_instructions] Error: {e}")
+        return []
+
+
+def _rl_user_table(el: dict, tw: float, s: dict) -> list:
+    """Build ReportLab flowables for a user-requested table."""
+    number = el.get('number', '')
+    columns = el.get('columns', [])
+    rows = [list(str(v) for v in r) for r in el.get('rows', [])]
+    out = []
+    out.append(Paragraph(f"Tabla {number}. {el.get('title','Tabla')}", s['h3']))
+    out.append(Spacer(1, 4))
+    if columns and rows:
+        n = max(len(columns), 1)
+        out.append(_make_table(columns, rows, col_widths=[tw / n] * n))
+    out.append(Spacer(1, 4))
+    out.append(Paragraph(f"Nota. {el.get('source','Elaboración propia')}.", s['sm']))
+    if el.get('interpretation'):
+        out.append(Paragraph(el['interpretation'], s['n']))
+    out.append(Spacer(1, 14))
+    return out
+
+
+def _rl_user_chart(el: dict, tw: float, s: dict) -> list:
+    """Build ReportLab flowables for a user-requested chart."""
+    from reportlab.graphics.shapes import Drawing, Rect, String
+    number = el.get('number', '')
+    chart_type = (el.get('chart_type') or 'bar').lower()
+    labels = [str(l) for l in el.get('labels', [])]
+    vals = [float(v) for v in el.get('data', []) if v is not None]
+    out = []
+    out.append(Paragraph(f"Figura {number}. {el.get('title','Gráfico')}", s['h3']))
+    out.append(Spacer(1, 6))
+    ch_w, ch_h = float(tw), 220.0
+    try:
+        if chart_type == 'pie' and vals:
+            from reportlab.graphics.charts.piecharts import Pie
+            d = Drawing(ch_w, ch_h)
+            pie = Pie()
+            pie.x = int(ch_w * 0.15); pie.y = 20
+            pie.width = 170; pie.height = 170
+            pie.data = vals[:8]
+            pie.labels = [l[:18] for l in labels[:8]]
+            pie.slices.strokeWidth = 0.5
+            _pal = ['#1e3a5f','#2d6a4f','#e07b39','#9b2226','#4361ee','#7209b7','#f72585','#4cc9f0']
+            for i, hx in enumerate(_pal[:len(vals)]):
+                pie.slices[i].fillColor = colors.HexColor(hx)
+            d.add(pie)
+            out.append(d)
+        elif chart_type == 'line' and vals:
+            from reportlab.graphics.charts.lineplots import LinePlot
+            d = Drawing(ch_w, ch_h)
+            lp = LinePlot()
+            lp.x = 60; lp.y = 40
+            lp.width = ch_w - 90; lp.height = ch_h - 60
+            lp.data = [[(i, v) for i, v in enumerate(vals)]]
+            lp.lines[0].strokeColor = colors.HexColor('#1e3a5f')
+            lp.lines[0].strokeWidth = 2
+            d.add(lp)
+            out.append(d)
+        else:
+            from reportlab.graphics.charts.barcharts import VerticalBarChart
+            d = Drawing(ch_w, ch_h)
+            bc = VerticalBarChart()
+            bc.x = 60; bc.y = 40
+            bc.width = ch_w - 90; bc.height = ch_h - 70
+            bc.data = [vals[:12]] if vals else [[0]]
+            bc.strokeColor = colors.white
+            bc.valueAxis.valueMin = 0
+            bc.valueAxis.valueMax = (max(vals) * 1.25) if vals else 100
+            bc.categoryAxis.labels.boxAnchor = 'ne'
+            bc.categoryAxis.labels.angle = 30 if len(labels) > 5 else 0
+            bc.categoryAxis.labels.fontSize = 8
+            bc.categoryAxis.categoryNames = [l[:14] for l in labels[:12]]
+            bc.bars[0].fillColor = colors.HexColor('#1e3a5f')
+            d.add(bc)
+            out.append(d)
+    except Exception as e:
+        print(f"[rl_user_chart] error: {e}")
+        out.append(Paragraph(f"[Gráfico: {el.get('title','')}]", s['n']))
+    out.append(Spacer(1, 4))
+    out.append(Paragraph(f"Nota. {el.get('source','Elaboración propia')}.", s['sm']))
+    if el.get('interpretation'):
+        out.append(Paragraph(el['interpretation'], s['n']))
+    out.append(Spacer(1, 14))
+    return out
+
+
+def _rl_user_image(el: dict, tw: float, s: dict) -> list:
+    """Build a styled placeholder for a user-requested image/diagram."""
+    from reportlab.graphics.shapes import Drawing, Rect, String
+    number = el.get('number', '')
+    desc = el.get('description', '')
+    out = []
+    out.append(Paragraph(f"Figura {number}. {el.get('title','Figura')}", s['h3']))
+    out.append(Spacer(1, 6))
+    box_h = 160.0
+    d = Drawing(float(tw), box_h)
+    d.add(Rect(2, 2, float(tw) - 4, box_h - 4,
+               strokeColor=colors.HexColor('#1e3a5f'),
+               fillColor=colors.HexColor('#f0f4fa'), strokeWidth=1.5))
+    words = desc.split()
+    lines_txt, cur = [], []
+    for w in words:
+        cur.append(w)
+        if len(' '.join(cur)) > 72:
+            lines_txt.append(' '.join(cur[:-1])); cur = [w]
+    if cur:
+        lines_txt.append(' '.join(cur))
+    y0 = box_h - 28
+    for i, line in enumerate(lines_txt[:6]):
+        d.add(String(float(tw) / 2, y0 - i * 18, line,
+                     fontSize=9, textAnchor='middle',
+                     fillColor=colors.HexColor('#1e3a5f')))
+    out.append(d)
+    out.append(Spacer(1, 4))
+    out.append(Paragraph(f"Nota. {el.get('source','Elaboración propia')}.", s['sm']))
+    out.append(Spacer(1, 14))
+    return out
+
+
+def _inject_pdf(story: list, extra: dict, keys: list, tw: float, s: dict):
+    """Append user-requested elements to story for the given section keys."""
+    if not extra:
+        return
+    flowables = []
+    for key in keys:
+        for el in extra.get(key, []):
+            t = el.get('type', '')
+            if t == 'table':
+                flowables.extend(_rl_user_table(el, tw, s))
+            elif t == 'chart':
+                flowables.extend(_rl_user_chart(el, tw, s))
+            elif t == 'image':
+                flowables.extend(_rl_user_image(el, tw, s))
+    if flowables:
+        story.append(Spacer(1, 8))
+        story.extend(flowables)
+
+
+def _inject_docx(doc_obj, extra: dict, keys: list):
+    """Append user-requested elements to a DOCX document for the given section keys."""
+    if not extra:
+        return
+    for key in keys:
+        for el in extra.get(key, []):
+            t = el.get('type', '')
+            number = el.get('number', '')
+            title = el.get('title', '')
+            if t == 'table':
+                h = doc_obj.add_heading(f"Tabla {number}. {title}", level=3)
+                for run in h.runs:
+                    run.font.color.rgb = RGBColor(0x1e, 0x3a, 0x5f)
+                cols = el.get('columns', [])
+                rows = el.get('rows', [])
+                if cols and rows:
+                    tbl = doc_obj.add_table(rows=1 + len(rows), cols=len(cols))
+                    tbl.style = 'Table Grid'
+                    for i, c in enumerate(cols):
+                        cell = tbl.rows[0].cells[i]
+                        cell.text = c
+                        for run in cell.paragraphs[0].runs:
+                            run.bold = True
+                            run.font.size = _Pt(9)
+                    for r_i, row in enumerate(rows):
+                        for c_i, val in enumerate(row[:len(cols)]):
+                            tbl.rows[r_i + 1].cells[c_i].text = str(val)
+                doc_obj.add_paragraph(f"Nota. {el.get('source','Elaboración propia')}.")
+                if el.get('interpretation'):
+                    doc_obj.add_paragraph(el['interpretation'])
+            elif t == 'chart':
+                h = doc_obj.add_heading(f"Figura {number}. {title}", level=3)
+                for run in h.runs:
+                    run.font.color.rgb = RGBColor(0x1e, 0x3a, 0x5f)
+                labels = el.get('labels', [])
+                data_vals = el.get('data', [])
+                p = doc_obj.add_paragraph(
+                    f"[Gráfico de {el.get('chart_type','barras')} — ver PDF para visualización]")
+                for run in p.runs:
+                    run.italic = True
+                if labels and data_vals:
+                    tbl = doc_obj.add_table(rows=2, cols=min(len(labels), len(data_vals)))
+                    tbl.style = 'Table Grid'
+                    for i in range(min(len(labels), len(data_vals))):
+                        tbl.rows[0].cells[i].text = str(labels[i])
+                        tbl.rows[1].cells[i].text = str(data_vals[i])
+                doc_obj.add_paragraph(f"Nota. {el.get('source','Elaboración propia')}.")
+                if el.get('interpretation'):
+                    doc_obj.add_paragraph(el['interpretation'])
+            elif t == 'image':
+                h = doc_obj.add_heading(f"Figura {number}. {title}", level=3)
+                for run in h.runs:
+                    run.font.color.rgb = RGBColor(0x1e, 0x3a, 0x5f)
+                p = doc_obj.add_paragraph(f"[{el.get('description','')}]")
+                for run in p.runs:
+                    run.italic = True
+                doc_obj.add_paragraph(f"Nota. {el.get('source','Elaboración propia')}.")
 
 
 # ── API pública extendida ─────────────────────────────────────────────────────
@@ -4771,20 +5076,29 @@ def generate_document(data: dict) -> dict:
         sec['cap5']     = _cap5(title)
         _ampliar_tesis_50_paginas(sec, title, rl)
 
+    # Parsear indicaciones de elementos del usuario (tablas, gráficos, imágenes)
+    extra_elements: dict = {}
+    table_instructions = (data.get('table_instructions') or '').strip()
+    if table_instructions:
+        raw_elements = _parse_elements_instructions(table_instructions, title, rl)
+        for el in raw_elements:
+            key = _normalize_section_key(el.get('section', 'extra'))
+            extra_elements.setdefault(key, []).append(el)
+
     # Construir PDF y DOCX
     if template_structure is not None:
         # Con plantilla: el builder respeta íntegramente la estructura de la plantilla
-        pdf_path  = _build_pdf_from_template(data, template_structure, sec, refs, uid, logo_path)
-        docx_path = _build_docx_from_template(data, template_structure, sec, refs, uid, logo_path)
+        pdf_path  = _build_pdf_from_template(data, template_structure, sec, refs, uid, logo_path, extra_elements or None)
+        docx_path = _build_docx_from_template(data, template_structure, sec, refs, uid, logo_path, extra_elements or None)
     elif doc_type == 'proyecto_tesis':
-        pdf_path  = _build_pdf_proyecto(data, sec, refs, uid, logo_path)
-        docx_path = _build_docx_proyecto(data, sec, refs, uid, logo_path)
+        pdf_path  = _build_pdf_proyecto(data, sec, refs, uid, logo_path, extra_elements or None)
+        docx_path = _build_docx_proyecto(data, sec, refs, uid, logo_path, extra_elements or None)
     elif doc_type == 'articulo':
-        pdf_path  = _build_pdf_articulo(data, sec, refs, uid, logo_path)
-        docx_path = _build_docx_articulo(data, sec, refs, uid, logo_path)
+        pdf_path  = _build_pdf_articulo(data, sec, refs, uid, logo_path, extra_elements or None)
+        docx_path = _build_docx_articulo(data, sec, refs, uid, logo_path, extra_elements or None)
     else:
-        pdf_path  = _build_pdf(data, sec, refs, uid, logo_path)
-        docx_path = _build_docx(data, sec, refs, uid, logo_path)
+        pdf_path  = _build_pdf(data, sec, refs, uid, logo_path, extra_elements or None)
+        docx_path = _build_docx(data, sec, refs, uid, logo_path, extra_elements or None)
 
     # Limpiar logo temporal
     if logo_path and os.path.exists(logo_path):

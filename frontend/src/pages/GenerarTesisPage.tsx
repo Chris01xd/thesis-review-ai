@@ -3,6 +3,7 @@ import {
   FileText, Download, Loader2, Sparkles, BookOpen,
   User, Users, MapPin, Calendar, ImagePlus, X,
   FileUp, GraduationCap, Newspaper, ClipboardList, Link,
+  BarChart2, Table2, Image,
 } from 'lucide-react'
 import { generateDocument, downloadThesisFile, getThesisPdfBlob, getUsers } from '../api'
 import type { ThesisResult, DocType } from '../api'
@@ -85,6 +86,27 @@ function parseAuthors(raw: string): string[] {
 
 const ORCID_RE = /^\d{4}-\d{4}-\d{4}-\d{3}[\dX]$/
 
+const WORD_NUMS: Record<string, number> = {
+  una:1,un:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,
+}
+function parseElementCount(text: string, keywords: string[]): number {
+  const kw = keywords.map(k => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
+  const m = text.toLowerCase().match(
+    new RegExp(`(\\d+|${Object.keys(WORD_NUMS).join('|')})\\s+(?:${kw})`, 'i')
+  )
+  if (!m) return 0
+  return WORD_NUMS[m[1].toLowerCase()] ?? parseInt(m[1]) ?? 0
+}
+interface ElementsSummary { tables: number; charts: number; images: number }
+function parseElementsSummary(text: string): ElementsSummary | null {
+  if (!text.trim()) return null
+  const t = parseElementCount(text, ['tabla','tablas','cuadro','cuadros'])
+  const c = parseElementCount(text, ['gráfico','grafico','gráficos','graficos','diagrama','diagramas','figura','figuras'])
+  const i = parseElementCount(text, ['imagen','imágenes','imagenes','foto','fotos','ilustración','ilustraciones'])
+  if (!t && !c && !i) return null
+  return { tables: t, charts: c, images: i }
+}
+
 const colorMap: Record<string, string> = {
   blue:    'border-blue-500 bg-blue-50 text-blue-700',
   emerald: 'border-emerald-500 bg-emerald-50 text-emerald-700',
@@ -108,6 +130,8 @@ export default function GenerarTesisPage() {
   const [logoData, setLogoData]     = useState<string>('')
   const [logoPreview, setLogoPreview] = useState<string>('')
   const [templateFiles, setTemplateFiles] = useState<File[]>([])
+  const [tableInstructions, setTableInstructions] = useState('')
+  const [elementsSummary, setElementsSummary] = useState<ElementsSummary | null>(null)
   const [advisors, setAdvisors]     = useState<{ id: number; name: string }[]>([])
   const logoInputRef     = useRef<HTMLInputElement>(null)
   const templateInputRef = useRef<HTMLInputElement>(null)
@@ -188,8 +212,9 @@ export default function GenerarTesisPage() {
         city:          form.city,
         year:          form.year,
         logo_data:     logoData || undefined,
-        authors_orcid:  hasOrcid ? orcidValues.join(',') : undefined,
-        template_files: templateFiles.length ? templateFiles : undefined,
+        authors_orcid:     hasOrcid ? orcidValues.join(',') : undefined,
+        template_files:    templateFiles.length ? templateFiles : undefined,
+        table_instructions: tableInstructions.trim() || undefined,
       })
       setResult(res)
       setLoadingPdf(true)
@@ -455,6 +480,53 @@ export default function GenerarTesisPage() {
               <p className="text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
                 La primera plantilla define la estructura principal. Las siguientes aportan secciones y tablas adicionales. Todas se fusionan para generar el documento.
               </p>
+            )}
+          </div>
+
+          {/* Indicaciones para tablas, gráficos e imágenes */}
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium text-gray-700 flex items-center gap-1.5">
+              <BarChart2 size={14} /> Indicaciones para tablas, gráficos e imágenes
+              <span className="font-normal text-gray-400">(opcional)</span>
+            </label>
+            <textarea
+              value={tableInstructions}
+              onChange={e => {
+                setTableInstructions(e.target.value)
+                setElementsSummary(parseElementsSummary(e.target.value))
+              }}
+              rows={4}
+              placeholder={`Ej: "Quiero 3 tablas: la primera con antecedentes nacionales, la segunda con antecedentes internacionales y la tercera con operacionalización de variables. También 2 gráficos de barras para comparar resultados y una imagen de la arquitectura del sistema."`}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+            />
+            {elementsSummary && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 space-y-1">
+                <p className="font-semibold">Elementos detectados:</p>
+                <div className="flex flex-wrap gap-3">
+                  {elementsSummary.tables > 0 && (
+                    <span className="flex items-center gap-1">
+                      <Table2 size={12} />
+                      <b>{elementsSummary.tables}</b> tabla{elementsSummary.tables !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                  {elementsSummary.charts > 0 && (
+                    <span className="flex items-center gap-1">
+                      <BarChart2 size={12} />
+                      <b>{elementsSummary.charts}</b> gráfico{elementsSummary.charts !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                  {elementsSummary.images > 0 && (
+                    <span className="flex items-center gap-1">
+                      <Image size={12} />
+                      <b>{elementsSummary.images}</b> imagen{elementsSummary.images !== 1 ? 'es' : ''}
+                    </span>
+                  )}
+                </div>
+                <p className="text-amber-600">Se generarán e insertarán en el documento según lo indicado.</p>
+              </div>
+            )}
+            {tableInstructions.trim() && !elementsSummary && (
+              <p className="text-xs text-gray-500">Indica cantidades específicas (ej: "3 tablas", "dos gráficos") para ver el resumen.</p>
             )}
           </div>
 
